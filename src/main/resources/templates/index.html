@@ -1,10 +1,3148 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
 <head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title
+        th:text="${developerName != null ? developerName + ' | SDE Portfolio' : 'SDE Portfolio | High-Velocity Architecture'}">
+        SDE Portfolio | High-Velocity Architecture</title>
+
+    <!-- Three.js via CDN — the ONLY external dependency -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Google Fonts: JetBrains Mono for terminal authenticity, Syne for display -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;600;700;800&display=swap"
+        rel="stylesheet" />
+
+    <style>
+        /* ═══════════════════════════════════════════════════
+           SECTION 0: CSS CUSTOM PROPERTIES & RESETS
+        ═══════════════════════════════════════════════════ */
+        :root {
+            /* Core Palette */
+            --void: #030508;
+            --void-surface: #070c14;
+            --panel: rgba(7, 14, 26, 0.60);
+            --panel-hover: rgba(7, 14, 26, 0.80);
+
+            /* Neon Accents */
+            --cyan: #00f3ff;
+            --cyan-dim: rgba(0, 243, 255, 0.15);
+            --cyan-glow: rgba(0, 243, 255, 0.35);
+            --purple: #bc13fe;
+            --purple-dim: rgba(188, 19, 254, 0.15);
+            --purple-glow: rgba(188, 19, 254, 0.35);
+            --green: #00ff9d;
+            --green-dim: rgba(0, 255, 157, 0.15);
+            --amber: #ffb800;
+
+            /* Typography */
+            --text: #e8f0fe;
+            --text-muted: #8892a4;
+            --text-dim: #404a5a;
+
+            /* Borders */
+            --border: rgba(255, 255, 255, 0.07);
+            --border-lit: rgba(0, 243, 255, 0.40);
+
+            /* Fonts */
+            --font-display: 'Syne', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+
+            /* Spacing */
+            --radius: 10px;
+            --radius-lg: 16px;
+
+            /* Transitions */
+            --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: var(--cyan-dim) transparent;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--cyan-dim);
+            border-radius: 3px;
+        }
+
+        body {
+            background-color: var(--void);
+            color: var(--text);
+            font-family: var(--font-mono);
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 1: WEBGL CANVAS LAYER (Z-Index Base)
+        ═══════════════════════════════════════════════════ */
+        #webgl-container {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            /* Pointer events disabled so mouse tracks through to UI */
+            pointer-events: none;
+        }
+
+        /* Vignette overlay to anchor UI against the infinite void */
+        #webgl-container::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center,
+                    transparent 30%,
+                    rgba(3, 5, 8, 0.60) 70%,
+                    rgba(3, 5, 8, 0.90) 100%);
+            pointer-events: none;
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 2: LAYOUT SKELETON
+        ═══════════════════════════════════════════════════ */
+        .page-wrapper {
+            position: relative;
+            z-index: 10;
+            max-width: 1340px;
+            margin: 0 auto;
+            padding: 0 2rem 8rem;
+        }
+
+        /* Glassmorphism base mixin — applied via class */
+        .glass {
+            background: var(--panel);
+            backdrop-filter: blur(18px) saturate(180%);
+            -webkit-backdrop-filter: blur(18px) saturate(180%);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 3: TOPBAR / NAVIGATION
+        ═══════════════════════════════════════════════════ */
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(3, 5, 8, 0.70);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .topbar-logo {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            color: var(--text);
+        }
+
+        .topbar-logo span {
+            color: var(--cyan);
+        }
+
+        .topbar-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: pulse-dot 2s infinite;
+        }
+
+        @keyframes pulse-dot {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.6;
+                transform: scale(0.8);
+            }
+        }
+
+        .topbar-nav {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .topbar-nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: color 0.2s var(--ease);
+        }
+
+        .topbar-nav a:hover {
+            color: var(--cyan);
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 4: HERO — TYPING TERMINAL INTRODUCTION
+        ═══════════════════════════════════════════════════ */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 6rem 0 4rem;
+        }
+
+        .hero-eyebrow {
+            font-size: 0.75rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--cyan);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .hero-eyebrow::before {
+            content: '';
+            display: block;
+            width: 40px;
+            height: 1px;
+            background: var(--cyan);
+            box-shadow: 0 0 8px var(--cyan);
+        }
+
+        .hero-name {
+            font-family: var(--font-display);
+            font-size: clamp(3rem, 8vw, 7rem);
+            font-weight: 800;
+            line-height: 0.95;
+            letter-spacing: -3px;
+            margin-bottom: 2rem;
+            /* Clipped gradient text */
+            background: linear-gradient(135deg, #ffffff 0%, #8892a4 60%, #404a5a 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Terminal prompt block */
+        .hero-terminal {
+            display: inline-block;
+            background: rgba(0, 243, 255, 0.04);
+            border: 1px solid var(--border-lit);
+            border-radius: var(--radius);
+            padding: 1.5rem 2rem;
+            max-width: 680px;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+
+        .hero-terminal::before {
+            content: 'IDENTITY.init()';
+            position: absolute;
+            top: -0.6rem;
+            left: 1.5rem;
+            background: var(--void);
+            padding: 0 0.5rem;
+            font-size: 0.7rem;
+            color: var(--cyan);
+            letter-spacing: 1.5px;
+        }
+
+        .terminal-line {
+            display: flex;
+            gap: 0.75rem;
+            margin-bottom: 0.35rem;
+            font-size: 0.9rem;
+        }
+
+        .terminal-line:last-child {
+            margin-bottom: 0;
+        }
+
+        .prompt {
+            color: var(--green);
+        }
+
+        .cmd {
+            color: var(--text-muted);
+        }
+
+        .val {
+            color: var(--cyan);
+        }
+
+        .str {
+            color: var(--amber);
+        }
+
+        .kw {
+            color: var(--purple);
+        }
+
+        /* Typing cursor */
+        #typing-output {
+            color: var(--text);
+            min-height: 1.4em;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1em;
+            background: var(--cyan);
+            vertical-align: text-bottom;
+            margin-left: 2px;
+            animation: blink 0.9s step-end infinite;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0;
+            }
+        }
+
+        .hero-cta {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 5: BUTTONS (GLOBAL)
+        ═══════════════════════════════════════════════════ */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.7rem 1.4rem;
+            border-radius: var(--radius);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-muted);
+            transition: all 0.22s var(--ease);
+            text-decoration: none;
+            white-space: nowrap;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.04));
+            opacity: 0;
+            transition: opacity 0.22s;
+        }
+
+        .btn:hover::after {
+            opacity: 1;
+        }
+
+        .btn:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+            color: var(--text);
+        }
+
+        /* Cyan primary */
+        .btn-cyan {
+            border-color: var(--cyan);
+            color: var(--cyan);
+            background: var(--cyan-dim);
+        }
+
+        .btn-cyan:hover {
+            background: var(--cyan);
+            color: #000;
+            box-shadow: 0 0 20px var(--cyan-glow), 0 0 40px rgba(0, 243, 255, 0.1);
+        }
+
+        /* Purple accent */
+        .btn-purple {
+            border-color: var(--purple);
+            color: var(--purple);
+            background: var(--purple-dim);
+        }
+
+        .btn-purple:hover {
+            background: var(--purple);
+            color: #fff;
+            box-shadow: 0 0 20px var(--purple-glow);
+        }
+
+        /* Micro engagement buttons */
+        .btn-engage {
+            padding: 0.45rem 0.9rem;
+            font-size: 0.75rem;
+            border-radius: 6px;
+        }
+
+        .btn-engage.liked {
+            border-color: var(--cyan);
+            color: var(--cyan);
+            background: var(--cyan-dim);
+        }
+
+        .btn-engage.liked:hover {
+            background: var(--cyan);
+            color: #000;
+        }
+
+        /* Loading state */
+        .btn.loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 6: SECTION HEADINGS
+        ═══════════════════════════════════════════════════ */
+        .section-header {
+            display: flex;
+            align-items: baseline;
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .section-label {
+            font-size: 0.7rem;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: var(--cyan);
+            white-space: nowrap;
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: clamp(1.8rem, 4vw, 2.6rem);
+            font-weight: 700;
+            letter-spacing: -1px;
+            line-height: 1;
+        }
+
+        .section-rule {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 7: SKILLS MATRIX
+        ═══════════════════════════════════════════════════ */
+        #skills {
+            padding: 5rem 0;
+        }
+
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .skill-cell {
+            background: var(--panel);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.75rem;
+            transition: border-color 0.3s var(--ease), transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Gradient shard top border */
+        .skill-cell::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--cyan), var(--purple));
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.4s var(--ease);
+        }
+
+        .skill-cell:hover::before {
+            transform: scaleX(1);
+        }
+
+        .skill-cell:hover {
+            border-color: rgba(0, 243, 255, 0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 243, 255, 0.08);
+        }
+
+        .skill-icon {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .skill-name {
+            font-family: var(--font-display);
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
+
+        .skill-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-top: 0.75rem;
+        }
+
+        .tag {
+            font-size: 0.68rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .tag-cyan {
+            border-color: rgba(0, 243, 255, 0.3);
+            color: var(--cyan);
+        }
+
+        .tag-purple {
+            border-color: rgba(188, 19, 254, 0.3);
+            color: var(--purple);
+        }
+
+        .tag-green {
+            border-color: rgba(0, 255, 157, 0.3);
+            color: var(--green);
+        }
+
+        .tag-amber {
+            border-color: rgba(255, 184, 0, 0.3);
+            color: var(--amber);
+        }
+
+        /* Competency bar */
+        .skill-bar {
+            margin-top: 1rem;
+            height: 3px;
+            background: var(--border);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+
+        .skill-bar-fill {
+            height: 100%;
+            border-radius: 99px;
+            background: linear-gradient(90deg, var(--cyan), var(--purple));
+            transform-origin: left;
+            transform: scaleX(0);
+            transition: transform 1.2s var(--ease);
+        }
+
+        .skill-cell.visible .skill-bar-fill {
+            transform: scaleX(1);
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 8: PROJECT ENGINE — THYMELEAF INTEGRATED
+        ═══════════════════════════════════════════════════ */
+        #projects {
+            padding: 5rem 0;
+        }
+
+        .projects-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 2rem;
+        }
+
+        /* ── Project Card ── */
+        .project-card {
+            background: var(--panel);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 0;
+            transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease), border-color 0.35s var(--ease);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            /* For Thymeleaf data binding */
+        }
+
+        .project-card:hover {
+            transform: translateY(-6px);
+            border-color: rgba(0, 243, 255, 0.25);
+            box-shadow: 0 20px 60px -10px rgba(0, 243, 255, 0.12);
+        }
+
+        /* Accent stripe */
+        .card-stripe {
+            height: 3px;
+            background: linear-gradient(90deg, var(--cyan), var(--purple), var(--cyan));
+            background-size: 200% 100%;
+            animation: stripe-flow 4s linear infinite paused;
+        }
+
+        .project-card:hover .card-stripe {
+            animation-play-state: running;
+        }
+
+        @keyframes stripe-flow {
+            0% {
+                background-position: 0% 0%;
+            }
+
+            100% {
+                background-position: 200% 0%;
+            }
+        }
+
+        .card-body {
+            padding: 2rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Category badge */
+        .card-category {
+            font-size: 0.68rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--purple);
+            margin-bottom: 0.75rem;
+        }
+
+        .card-title {
+            font-family: var(--font-display);
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            line-height: 1.2;
+            letter-spacing: -0.5px;
+        }
+
+        .card-desc {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            line-height: 1.75;
+            flex: 1;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Tech stack chips inside card */
+        .card-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* ── Engagement Bar ── */
+        .engagement-bar {
+            padding: 1rem 2rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            flex-wrap: wrap;
+            background: rgba(3, 5, 8, 0.30);
+        }
+
+        .engage-counter {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-left: 0.2rem;
+        }
+
+        /* Comment panel (toggle) */
+        .comment-panel {
+            display: none;
+            border-top: 1px solid var(--border);
+            padding: 1rem 2rem;
+            background: rgba(3, 5, 8, 0.30);
+        }
+
+        .comment-panel.open {
+            display: block;
+        }
+
+        .comment-input-row {
+            display: flex;
+            gap: 0.6rem;
+            margin-top: 0.5rem;
+        }
+
+        .comment-field {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem 0.9rem;
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            transition: border-color 0.2s;
+        }
+
+        .comment-field:focus {
+            outline: none;
+            border-color: var(--cyan);
+        }
+
+        .comments-list {
+            list-style: none;
+            margin-top: 0.75rem;
+        }
+
+        .comments-list li {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            padding: 0.4rem 0;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .comments-list li .comment-author {
+            color: var(--cyan);
+        }
+
+        .comments-list li:last-child {
+            border-bottom: none;
+        }
+
+        /* ── Share Dropdown ── */
+        .share-wrapper {
+            position: relative;
+        }
+
+        .share-menu {
+            position: absolute;
+            bottom: calc(100% + 0.5rem);
+            left: 0;
+            background: var(--void-surface);
+            border: 1px solid var(--border-lit);
+            border-radius: var(--radius);
+            padding: 0.5rem;
+            display: none;
+            z-index: 50;
+            min-width: 160px;
+        }
+
+        .share-menu.open {
+            display: block;
+        }
+
+        .share-menu a {
+            display: block;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.15s, color 0.15s;
+        }
+
+        .share-menu a:hover {
+            background: var(--cyan-dim);
+            color: var(--cyan);
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 9: LIVE EXECUTION TERMINAL
+        ═══════════════════════════════════════════════════ */
+        #terminal-section {
+            padding: 5rem 0;
+        }
+
+        .terminal-module {
+            background: rgba(3, 5, 8, 0.80);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-lit);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: 0 0 60px rgba(0, 243, 255, 0.05), 0 0 0 1px rgba(0, 243, 255, 0.05) inset;
+        }
+
+        /* Title bar (macOS-style chrome) */
+        .terminal-chrome {
+            padding: 0.75rem 1.25rem;
+            background: rgba(0, 0, 0, 0.50);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .chrome-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+        }
+
+        .dot-red {
+            background: #ff5f56;
+        }
+
+        .dot-yellow {
+            background: #ffbd2e;
+        }
+
+        .dot-green {
+            background: #27c93f;
+        }
+
+        .chrome-title {
+            margin-left: 0.75rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        .chrome-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .ws-indicator {
+            font-size: 0.68rem;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .ws-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--amber);
+            box-shadow: 0 0 6px var(--amber);
+        }
+
+        .ws-dot.connected {
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
+        }
+
+        /* Output pane */
+        .terminal-output {
+            padding: 1.5rem;
+            min-height: 340px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 0.82rem;
+            line-height: 1.8;
+            scrollbar-width: thin;
+            scrollbar-color: var(--cyan-dim) transparent;
+        }
+
+        .term-line {
+            display: flex;
+            gap: 0.6rem;
+            margin-bottom: 0.15rem;
+        }
+
+        .term-ts {
+            color: var(--text-dim);
+            flex-shrink: 0;
+        }
+
+        .term-prompt-sym {
+            color: var(--cyan);
+            flex-shrink: 0;
+        }
+
+        .term-text {
+            color: var(--text-muted);
+            word-break: break-all;
+        }
+
+        .term-text.output {
+            color: var(--text);
+        }
+
+        .term-text.success {
+            color: var(--green);
+        }
+
+        .term-text.error {
+            color: #ff5f56;
+        }
+
+        .term-text.info {
+            color: var(--cyan);
+        }
+
+        .term-text.warn {
+            color: var(--amber);
+        }
+
+        /* Input row */
+        .terminal-input-row {
+            padding: 0.75rem 1.5rem 1.25rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: rgba(0, 0, 0, 0.30);
+        }
+
+        .term-input-prompt {
+            color: var(--cyan);
+            font-size: 0.88rem;
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .term-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 0.88rem;
+            caret-color: var(--cyan);
+        }
+
+        .term-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .term-submit {
+            padding: 0.45rem 1.1rem;
+            font-size: 0.75rem;
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 10: FOOTER
+        ═══════════════════════════════════════════════════ */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 3rem 2rem;
+            max-width: 1340px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: rgba(200, 210, 225, 0.7);
+            font-size: 0.78rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        footer span {
+            color: var(--cyan);
+            font-weight: 600;
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 11: SCAN LINE OVERLAY (Aesthetic detail)
+        ═══════════════════════════════════════════════════ */
+        .scanline-overlay {
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 243, 255, 0.012) 2px,
+                    rgba(0, 243, 255, 0.012) 4px);
+            pointer-events: none;
+            z-index: 999;
+            animation: scanline-scroll 8s linear infinite;
+        }
+
+        @keyframes scanline-scroll {
+            from {
+                background-position: 0 0;
+            }
+
+            to {
+                background-position: 0 100px;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 12: RESPONSIVE OVERRIDES
+        ═══════════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+            .page-wrapper {
+                padding: 0 1rem 6rem;
+            }
+
+            .hero-name {
+                letter-spacing: -2px;
+            }
+
+            .projects-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .skills-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+
+            .topbar-nav {
+                display: none;
+            }
+
+            .hero-terminal {
+                padding: 1rem 1.25rem;
+            }
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 13: ENTRY ANIMATIONS
+        ═══════════════════════════════════════════════════ */
+        .fade-up {
+            opacity: 0;
+            transform: translateY(28px);
+            transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+        }
+
+        .fade-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Staggered delay utility classes */
+        .delay-1 {
+            transition-delay: 0.1s;
+        }
+
+        .delay-2 {
+            transition-delay: 0.2s;
+        }
+
+        .delay-3 {
+            transition-delay: 0.3s;
+        }
+
+        .delay-4 {
+            transition-delay: 0.4s;
+        }
+
+        .delay-5 {
+            transition-delay: 0.5s;
+        }
+
+        /* Notification Toast */
+        #toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 0.75rem 1.25rem;
+            background: var(--void-surface);
+            border: 1px solid var(--border-lit);
+            border-radius: var(--radius);
+            font-size: 0.8rem;
+            color: var(--cyan);
+            z-index: 9999;
+            transform: translateY(80px);
+            opacity: 0;
+            transition: transform 0.3s var(--ease), opacity 0.3s var(--ease);
+            pointer-events: none;
+        }
+
+        #toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-dim);
+        }
+
+        .empty-state svg {
+            margin-bottom: 1rem;
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 15: CONTACT SECTION
+        ═══════════════════════════════════════════════════ */
+        #contact {
+            padding: 5rem 0;
+        }
+
+        .contact-grid {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .contact-card {
+            background: var(--panel);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 2rem 2.5rem;
+            text-align: center;
+            text-decoration: none;
+            color: var(--text-muted);
+            transition: all 0.3s var(--ease);
+            min-width: 200px;
+        }
+
+        .contact-card:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(0, 243, 255, 0.08);
+        }
+
+        .contact-card svg {
+            margin-bottom: 0.75rem;
+            display: block;
+            margin-inline: auto;
+        }
+
+        .contact-card-label {
+            font-family: var(--font-display);
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        /* ═══════════════════════════════════════════════════
+           SECTION 16: GLASSMORPHISM MODALS
+        ═══════════════════════════════════════════════════ */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 5000;
+            background: rgba(3, 5, 8, 0.85);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            justify-content: center;
+            align-items: flex-start;
+            padding: 3vh 1rem;
+            overflow-y: auto;
+        }
+
+        .modal-overlay.open {
+            display: flex;
+            animation: fadeModalIn 0.25s var(--ease);
+        }
+
+        @keyframes fadeModalIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .modal-panel {
+            background: var(--void-surface);
+            border: 1px solid var(--border-lit);
+            border-radius: var(--radius-lg);
+            width: 100%;
+            max-width: 820px;
+            overflow: hidden;
+            animation: slideModalUp 0.3s var(--ease);
+        }
+
+        @keyframes slideModalUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-chrome {
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            background: rgba(0, 0, 0, 0.5);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-chrome-title {
+            margin-left: 0.75rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            flex: 1;
+        }
+
+        .modal-close {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 0.3rem 0.6rem;
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            transition: all 0.2s;
+        }
+
+        .modal-close:hover {
+            border-color: #ff5f56;
+            color: #ff5f56;
+        }
+
+        .modal-body-content {
+            padding: 2rem;
+            max-height: 75vh;
+            overflow-y: auto;
+        }
+
+        /* Form styles inside modals */
+        .form-grid {
+            display: grid;
+            gap: 1.5rem;
+        }
+
+        .form-row-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        .form-field label {
+            display: block;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--cyan);
+            margin-bottom: 0.5rem;
+        }
+
+        .form-field input,
+        .form-field textarea,
+        .form-field select {
+            width: 100%;
+            padding: 0.7rem 1rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-field input:focus,
+        .form-field textarea:focus,
+        .form-field select:focus {
+            outline: none;
+            border-color: var(--cyan);
+        }
+
+        .form-field textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-field select {
+            cursor: pointer;
+        }
+
+        .form-field select option {
+            background: var(--void);
+            color: var(--text);
+        }
+
+        .form-field small {
+            display: block;
+            margin-top: 0.35rem;
+            font-size: 0.72rem;
+            color: var(--text-dim);
+        }
+
+        .form-field input::placeholder,
+        .form-field textarea::placeholder {
+            color: var(--text-dim);
+        }
+
+        .form-check {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .form-check input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--cyan);
+            cursor: pointer;
+        }
+
+        .file-drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            color: var(--text-dim);
+            font-size: 0.82rem;
+            position: relative;
+        }
+
+        .file-drop-zone:hover,
+        .file-drop-zone.drag-over {
+            border-color: var(--cyan);
+            background: var(--cyan-dim);
+        }
+
+        .file-drop-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .file-drop-zone img {
+            max-width: 240px;
+            max-height: 160px;
+            border-radius: 6px;
+            margin-top: 0.75rem;
+        }
+
+        .form-actions-bar {
+            display: flex;
+            gap: 0.8rem;
+            justify-content: flex-end;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+            margin-top: 1.5rem;
+        }
+
+        /* Editor toolbar */
+        .editor-toolbar {
+            display: flex;
+            gap: 0.3rem;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
+            border-radius: 6px 6px 0 0;
+            border-bottom: none;
+        }
+
+        .editor-toolbar button {
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 0.35rem 0.5rem;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .editor-toolbar button:hover {
+            border-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .editor-toolbar+textarea {
+            border-radius: 0 0 6px 6px;
+        }
+
+        .char-count {
+            text-align: right;
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            margin-top: 0.3rem;
+        }
+
+        /* Project detail modal */
+        .project-detail-image {
+            width: 100%;
+            max-height: 350px;
+            object-fit: cover;
+            border-radius: var(--radius);
+            margin-bottom: 1.5rem;
+        }
+
+        .project-detail-status {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .status-completed {
+            background: var(--green-dim);
+            color: var(--green);
+            border: 1px solid rgba(0, 255, 157, 0.3);
+        }
+
+        .status-in-progress {
+            background: rgba(255, 184, 0, 0.15);
+            color: var(--amber);
+            border: 1px solid rgba(255, 184, 0, 0.3);
+        }
+
+        .status-planning {
+            background: var(--cyan-dim);
+            color: var(--cyan);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+        }
+
+        .project-detail-links {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 1.5rem;
+        }
+
+        /* Admin auth overlay */
+        .auth-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 6000;
+            background: rgba(3, 5, 8, 0.92);
+            backdrop-filter: blur(10px);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .auth-overlay.open {
+            display: flex;
+        }
+
+        .auth-box {
+            background: var(--void-surface);
+            border: 1px solid var(--border-lit);
+            border-radius: var(--radius-lg);
+            padding: 2.5rem;
+            text-align: center;
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .auth-box h3 {
+            font-family: var(--font-display);
+            margin-bottom: 1rem;
+            color: var(--text);
+        }
+
+        .auth-box input {
+            margin-bottom: 1rem;
+        }
+
+        /* Hamburger menu */
+        .hamburger {
+            display: none;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 0.4rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 99;
+            background: rgba(3, 5, 8, 0.95);
+            backdrop-filter: blur(20px);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .mobile-nav.open {
+            display: flex;
+        }
+
+        .mobile-nav a {
+            color: var(--text);
+            text-decoration: none;
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            font-weight: 700;
+            transition: color 0.2s;
+        }
+
+        .mobile-nav a:hover {
+            color: var(--cyan);
+        }
+
+        .mobile-nav-close {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 0.4rem 0.7rem;
+            font-size: 1.2rem;
+        }
+
+        /* Loading skeleton */
+        .skeleton {
+            background: linear-gradient(90deg, var(--panel) 25%, rgba(255, 255, 255, 0.05) 50%, var(--panel) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: var(--radius);
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .hamburger {
+                display: block;
+            }
+
+            .form-row-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .contact-grid {
+                flex-direction: column;
+            }
+        }
+    </style>
 </head>
+
 <body>
-$END$
+
+    <!-- ═══════════════════════════════════════════════════════════
+     THREE.JS CANVAS (behind everything)
+═════════════════════════════════════════════════════════════ -->
+    <div id="webgl-container"></div>
+
+    <!-- CRT Scanline Overlay — purely aesthetic -->
+    <div class="scanline-overlay" aria-hidden="true"></div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     TOP NAVIGATION BAR
+═════════════════════════════════════════════════════════════ -->
+    <nav class="topbar" aria-label="Primary navigation">
+        <div class="topbar-logo">
+            <!-- Thymeleaf: ${developerHandle} or fallback -->
+            <span th:text="${developerHandle != null ? developerHandle : '@sys.architect'}">@sys.architect</span>
+        </div>
+        <div class="topbar-status">
+            <div class="status-dot" aria-hidden="true"></div>
+            <span>Systems Online</span>
+        </div>
+        <ul class="topbar-nav">
+            <li><a href="#skills">Skills</a></li>
+            <li><a href="#projects">Projects</a></li>
+
+            <li><a href="#contact">Contact</a></li>
+            <li><a href="#terminal-section">Terminal</a></li>
+        </ul>
+        <button class="hamburger" id="hamburger-btn" aria-label="Open menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        </button>
+    </nav>
+
+    <!-- Mobile Navigation Overlay -->
+    <div class="mobile-nav" id="mobile-nav">
+        <button class="mobile-nav-close" id="mobile-nav-close" aria-label="Close menu">&times;</button>
+        <a href="#skills" class="mobile-nav-link">Skills</a>
+        <a href="#projects" class="mobile-nav-link">Projects</a>
+
+        <a href="#contact" class="mobile-nav-link">Contact</a>
+        <a href="#terminal-section" class="mobile-nav-link">Terminal</a>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     MAIN PAGE CONTENT
+═════════════════════════════════════════════════════════════ -->
+    <div class="page-wrapper">
+
+        <!-- ════════════════════════════════════════
+         SECTION A: HERO
+    ════════════════════════════════════════ -->
+        <section class="hero" aria-labelledby="hero-name">
+
+            <p class="hero-eyebrow fade-up">Java Software Developer &mdash; Systems &amp; Backend Developer</p>
+
+            <h1 id="hero-name" class="hero-name fade-up delay-1"
+                th:text="${developerName != null ? developerName : 'Rohan Bisht'}">
+                Rohan Bisht
+            </h1>
+
+            <!--
+            HERO TERMINAL BLOCK
+            Static display lines give the "initialized system" feel.
+            The final line is populated by the JS typing animation.
+        -->
+            <div class="hero-terminal fade-up delay-2" aria-label="Developer identity terminal">
+                <div class="terminal-line">
+                    <span class="prompt">$</span>
+                    <span class="cmd">cat</span>
+                    <span class="val">./profile.conf</span>
+                </div>
+                <div class="terminal-line">
+                    <span class="prompt">&gt;</span>
+                    <span class="kw">role</span>
+                    <span class="cmd">=</span>
+                    <span class="str">"Java Software Developer | Systems Architect"</span>
+                </div>
+                <div class="terminal-line">
+                    <span class="prompt">&gt;</span>
+                    <span class="kw">stack</span>
+                    <span class="cmd">=</span>
+                    <span class="str">"Java / C / Python / Spring Boot"</span>
+                </div>
+                <div class="terminal-line">
+                    <span class="prompt">&gt;</span>
+                    <span class="kw">focus</span>
+                    <span class="cmd">=</span>
+                    <span class="str">"High-throughput APIs · Spring Boot Microservices · Systems Design"</span>
+                </div>
+                <div class="terminal-line">
+                    <span class="prompt">&gt;</span>
+                    <span class="kw">status</span>
+                    <span class="cmd">=</span>
+                    <span id="typing-output"><span class="cursor" aria-hidden="true"></span></span>
+                </div>
+            </div>
+
+            <div class="hero-cta fade-up delay-3">
+                <a href="#projects" class="btn btn-cyan">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        aria-hidden="true">
+                        <path d="M4 6h16M4 12h16M4 18h10" />
+                    </svg>
+                    View Projects
+                </a>
+                <button class="btn btn-purple" id="btn-add-project">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        aria-hidden="true">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Add Project
+                </button>
+                <a href="/resume" class="btn" id="btn-download-resume" download>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download Resume
+                </a>
+            </div>
+
+        </section>
+
+        <!-- ════════════════════════════════════════
+         SECTION B: SKILLS MATRIX
+    ════════════════════════════════════════ -->
+        <section id="skills" aria-labelledby="skills-heading">
+
+            <div class="section-header fade-up">
+                <span class="section-label">02 &mdash; Competencies</span>
+                <h2 id="skills-heading" class="section-title">Skills Matrix</h2>
+                <div class="section-rule" aria-hidden="true"></div>
+            </div>
+
+            <div class="skills-grid">
+
+                <!-- Java & Systems -->
+                <div class="skill-cell fade-up delay-1">
+                    <span class="skill-icon" aria-hidden="true">☕</span>
+                    <div class="skill-name">Java & Systems Design</div>
+                    <div class="skill-tags">
+                        <span class="tag tag-cyan">OOP</span>
+                        <span class="tag tag-cyan">Multithreading</span>
+                        <span class="tag">Collections Framework</span>
+                        <span class="tag">JVM Internals</span>
+                        <span class="tag">Design Patterns</span>
+                    </div>
+                    <div class="skill-bar">
+                        <div class="skill-bar-fill" style="--fill: 0.92" data-fill="0.92"></div>
+                    </div>
+                </div>
+
+                <!-- C Programming -->
+                <div class="skill-cell fade-up delay-2">
+                    <span class="skill-icon" aria-hidden="true">⚙️</span>
+                    <div class="skill-name">C Programming</div>
+                    <div class="skill-tags">
+                        <span class="tag tag-purple">Pointers</span>
+                        <span class="tag tag-purple">Memory Management</span>
+                        <span class="tag">Data Structures</span>
+                        <span class="tag">Socket Programming</span>
+                    </div>
+                    <div class="skill-bar">
+                        <div class="skill-bar-fill" data-fill="0.88"></div>
+                    </div>
+                </div>
+
+                <!-- Spring Boot & Backend -->
+                <div class="skill-cell fade-up delay-3">
+                    <span class="skill-icon" aria-hidden="true">🔌</span>
+                    <div class="skill-name">Spring Boot & Backend</div>
+                    <div class="skill-tags">
+                        <span class="tag tag-amber">Spring Boot</span>
+                        <span class="tag tag-amber">REST APIs</span>
+                        <span class="tag">Hibernate / JPA</span>
+                        <span class="tag">PostgreSQL</span>
+                        <span class="tag">Thymeleaf</span>
+                    </div>
+                    <div class="skill-bar">
+                        <div class="skill-bar-fill" data-fill="0.90"></div>
+                    </div>
+                </div>
+
+                <!-- Python -->
+                <div class="skill-cell fade-up delay-4">
+                    <span class="skill-icon" aria-hidden="true">🐍</span>
+                    <div class="skill-name">Python</div>
+                    <div class="skill-tags">
+                        <span class="tag tag-green">Scripting</span>
+                        <span class="tag tag-green">Automation</span>
+                        <span class="tag">Flask</span>
+                        <span class="tag">Data Processing</span>
+                    </div>
+                    <div class="skill-bar">
+                        <div class="skill-bar-fill" data-fill="0.85"></div>
+                    </div>
+                </div>
+
+                <!-- DSA -->
+                <div class="skill-cell fade-up delay-2">
+                    <span class="skill-icon" aria-hidden="true">🧮</span>
+                    <div class="skill-name">Data Structures & Algorithms</div>
+                    <div class="skill-tags">
+                        <span class="tag tag-purple">Arrays & Strings</span>
+                        <span class="tag">Trees & Graphs</span>
+                        <span class="tag">Binary Search</span>
+                        <span class="tag">Dynamic Programming</span>
+                    </div>
+                    <div class="skill-bar">
+                        <div class="skill-bar-fill" data-fill="0.86"></div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ════════════════════════════════════════
+         SECTION C: PROJECT ENGINE
+         Thymeleaf bindings for dynamic rendering
+    ════════════════════════════════════════ -->
+        <section id="projects" aria-labelledby="projects-heading">
+
+            <div class="section-header fade-up">
+                <span class="section-label">03 &mdash; Work</span>
+                <h2 id="projects-heading" class="section-title">Project Engine</h2>
+                <div class="section-rule" aria-hidden="true"></div>
+            </div>
+
+            <div style="margin-bottom:1.5rem;" class="fade-up delay-1">
+                <button class="btn btn-purple" id="btn-add-project-section">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                    Add New Project
+                </button>
+            </div>
+
+            <div class="projects-grid">
+
+                <!--
+            ════════════════════════════════════════════════════
+            THYMELEAF DYNAMIC BLOCK
+            th:each iterates over the List<Project> model attribute.
+            Each card is self-contained: it reads project.id for API calls.
+
+            Expected Spring model attributes:
+              - projects (List<Project>) where Project has:
+                .id, .title, .description, .category, .techStack (List<String>), .likeCount
+            ════════════════════════════════════════════════════
+            -->
+                <article class="project-card fade-up" th:each="project, iterStat : ${projects}"
+                    th:attr="data-project-id=${project.id}" th:classappend="${'delay-' + (iterStat.index % 4 + 1)}"
+                    aria-label="${project.title}">
+
+                    <div class="card-stripe" aria-hidden="true"></div>
+
+                    <div class="card-body">
+                        <!-- Category badge — maps to project.category -->
+                        <div class="card-category" th:text="${project.category}">SYSTEMS</div>
+
+                        <!-- Project title -->
+                        <h3 class="card-title" th:text="${project.title}">Project Title</h3>
+
+                        <!-- Description -->
+                        <p class="card-desc" th:text="${project.description}">
+                            Project description from backend model.
+                        </p>
+
+                        <!-- Tech stack chips — nested Thymeleaf each -->
+                        <div class="card-stack">
+                            <span class="tag tag-cyan" th:each="tech : ${project.techStack}"
+                                th:text="${tech}">C++</span>
+                        </div>
+                    </div>
+
+                    <!-- Engagement Bar — buttons POST to REST endpoints -->
+                    <div class="engagement-bar">
+
+                        <!-- LIKE BUTTON — JS sends POST /api/projects/{id}/like -->
+                        <button class="btn btn-engage btn-like" th:attr="data-id=${project.id}"
+                            aria-label="Like this project">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" aria-hidden="true">
+                                <path
+                                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                            </svg>
+                            Like
+                            <span class="engage-counter like-count"
+                                th:text="${project.likeCount != null ? project.likeCount : 0}">0</span>
+                        </button>
+
+                        <!-- SHARE BUTTON — opens share dropdown -->
+                        <div class="share-wrapper">
+                            <button class="btn btn-engage btn-share" th:attr="data-id=${project.id}"
+                                aria-label="Share this project" aria-haspopup="true" aria-expanded="false">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5" aria-hidden="true">
+                                    <circle cx="18" cy="5" r="3" />
+                                    <circle cx="6" cy="12" r="3" />
+                                    <circle cx="18" cy="19" r="3" />
+                                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                                    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                                </svg>
+                                Share
+                            </button>
+                            <div class="share-menu" th:attr="id=${'share-menu-' + project.id}" role="menu">
+                                <a href="#" role="menuitem" th:attr="data-share-url=${'/project/' + project.id}"
+                                    class="share-copy-link">
+                                    📋 Copy Link
+                                </a>
+                                <a href="#" role="menuitem"
+                                    th:href="'https://twitter.com/intent/tweet?text=Check+this+out:+' + project.title"
+                                    target="_blank" rel="noopener">
+                                    🐦 Twitter / X
+                                </a>
+                                <a href="#" role="menuitem"
+                                    th:href="'https://www.linkedin.com/sharing/share-offsite/?url=/project/' + project.id"
+                                    target="_blank" rel="noopener">
+                                    💼 LinkedIn
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- COMMENT BUTTON — toggles comment panel -->
+                        <button class="btn btn-engage btn-comment" th:attr="data-id=${project.id}"
+                            aria-label="View comments" aria-expanded="false">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5" aria-hidden="true">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                            </svg>
+                            Comment
+                        </button>
+
+                    </div><!-- /engagement-bar -->
+
+                    <!-- Collapsible comment panel -->
+                    <div class="comment-panel" th:attr="id=${'comments-' + project.id}" aria-live="polite">
+                        <ul class="comments-list" th:attr="id=${'comments-list-' + project.id}">
+                            <!-- Comments injected dynamically by JS -->
+                            <li style="color: var(--text-dim); font-size:0.78rem;">
+                                No comments yet. Be the first.
+                            </li>
+                        </ul>
+                        <div class="comment-input-row">
+                            <input type="text" class="comment-field" th:attr="id=${'comment-field-' + project.id}"
+                                placeholder="Add a comment..." maxlength="280" aria-label="Write a comment" />
+                            <button class="btn btn-cyan btn-comment-submit" th:attr="data-id=${project.id}">
+                                Send
+                            </button>
+                        </div>
+                    </div>
+
+                </article><!-- /th:each -->
+
+                <!-- Empty state when no projects exist -->
+                <div class="empty-state" th:if="${projects == null or projects.isEmpty()}">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                        <line x1="8" y1="21" x2="16" y2="21" />
+                        <line x1="12" y1="17" x2="12" y2="21" />
+                    </svg>
+                    <h3>No projects yet</h3>
+                    <p style="color:var(--text-dim);margin-bottom:1.5rem;">Click "Add New Project" to showcase your
+                        work.</p>
+                </div>
+
+            </div><!-- /projects-grid -->
+        </section>
+
+        <!-- ════════════════════════════════════════
+         SECTION D: LIVE EXECUTION TERMINAL
+         Styled like a Linux console.
+         Designed to hook into a backend WebSocket.
+    ════════════════════════════════════════ -->
+        <section id="terminal-section" aria-labelledby="terminal-heading">
+
+            <div class="section-header fade-up">
+                <span class="section-label">04 &mdash; Runtime</span>
+                <h2 id="terminal-heading" class="section-title">Live Execution Terminal</h2>
+                <div class="section-rule" aria-hidden="true"></div>
+            </div>
+
+            <div class="terminal-module fade-up delay-1">
+
+                <!-- Chrome / Title Bar -->
+                <div class="terminal-chrome" aria-hidden="true">
+                    <div class="chrome-dot dot-red" title="Close"></div>
+                    <div class="chrome-dot dot-yellow" title="Minimize"></div>
+                    <div class="chrome-dot dot-green" title="Maximize"></div>
+                    <span class="chrome-title">bash — portfolio-executor — 80×24</span>
+                    <div class="chrome-right">
+                        <div class="ws-indicator" id="ws-indicator">
+                            <div class="ws-dot" id="ws-dot"></div>
+                            <span id="ws-status-label">WebSocket: Idle</span>
+                        </div>
+                        <button class="btn btn-engage" id="btn-clear-terminal" title="Clear terminal">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Output Pane -->
+                <pre class="terminal-output" id="terminal-output" role="log" aria-live="polite"
+                    aria-label="Terminal output" tabindex="0">
+            </pre>
+
+                <!-- Command Input Row -->
+                <div class="terminal-input-row">
+                    <span class="term-input-prompt" aria-hidden="true">visitor@portfolio:~$</span>
+                    <input type="text" id="terminal-input" class="term-input"
+                        placeholder="Type 'help' to see available commands..." autocomplete="off" spellcheck="false"
+                        aria-label="Terminal command input" />
+                    <button class="btn btn-cyan term-submit" id="btn-run" aria-label="Execute command">
+                        &#9654; Run
+                    </button>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ════════════════════════════════════════
+         SECTION E: CONTACT
+    ════════════════════════════════════════ -->
+        <section id="contact" aria-labelledby="contact-heading">
+            <div class="section-header fade-up">
+                <span class="section-label">04 &mdash; Connect</span>
+                <h2 id="contact-heading" class="section-title">Get In Touch</h2>
+                <div class="section-rule" aria-hidden="true"></div>
+            </div>
+            <p class="fade-up delay-1"
+                style="text-align:center;color:var(--text-muted);margin-bottom:2.5rem;font-size:0.9rem;">Let's build
+                something exceptional together.</p>
+            <div class="contact-grid fade-up delay-2">
+                <a href="https://mail.google.com/mail/?view=cm&to=bishtrohan33@gmail.com" target="_blank" rel="noopener"
+                    class="contact-card" id="contact-email">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                        <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                    <div class="contact-card-label">Email Me</div>
+                </a>
+                <a href="https://www.linkedin.com/in/rohan-bisht-0735771a1/" target="_blank" rel="noopener"
+                    class="contact-card" id="contact-linkedin">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+                        <rect x="2" y="9" width="4" height="12" />
+                        <circle cx="4" cy="4" r="2" />
+                    </svg>
+                    <div class="contact-card-label">LinkedIn</div>
+                </a>
+                <a href="https://github.com/RohanBisht33" target="_blank" rel="noopener" class="contact-card"
+                    id="contact-github">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+                    </svg>
+                    <div class="contact-card-label">GitHub</div>
+                </a>
+            </div>
+        </section>
+
+    </div><!-- /page-wrapper -->
+
+    <!-- ═══════════════════════════════════════════════════════════
+     MODAL: Project Detail View
+═════════════════════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="modal-project-detail">
+        <div class="modal-panel">
+            <div class="modal-chrome">
+                <div class="chrome-dot dot-red"></div>
+                <div class="chrome-dot dot-yellow"></div>
+                <div class="chrome-dot dot-green"></div>
+                <span class="modal-chrome-title">project — detail view</span>
+                <button class="modal-close" data-modal-close="modal-project-detail">ESC</button>
+            </div>
+            <div class="modal-body-content" id="project-detail-content">
+                <!-- Populated dynamically by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     MODAL: Add Project (Admin)
+═════════════════════════════════════════════════════════════ -->
+    <div class="modal-overlay" id="modal-add-project">
+        <div class="modal-panel">
+            <div class="modal-chrome">
+                <div class="chrome-dot dot-red"></div>
+                <div class="chrome-dot dot-yellow"></div>
+                <div class="chrome-dot dot-green"></div>
+                <span class="modal-chrome-title">admin — add project</span>
+                <button class="modal-close" data-modal-close="modal-add-project">ESC</button>
+            </div>
+            <div class="modal-body-content">
+                <form id="add-project-form" class="form-grid" enctype="multipart/form-data">
+                    <div class="form-field">
+                        <label for="proj-title">Project Title</label>
+                        <input type="text" id="proj-title" name="title" required placeholder="Enter project name" />
+                    </div>
+                    <div class="form-field">
+                        <label for="proj-image">Project Image</label>
+                        <div class="file-drop-zone" id="proj-drop-zone">
+                            <input type="file" id="proj-image" name="image" accept="image/*" />
+                            <p>Click or drag to upload — PNG, JPG, WEBP up to 5MB</p>
+                            <img id="proj-preview-img" style="display:none" alt="Preview" />
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label for="proj-desc">Description</label>
+                        <textarea id="proj-desc" name="description" required
+                            placeholder="Describe your project, its features, and what makes it special..." rows="5"></textarea>
+                        <div class="char-count"><span id="proj-char-count">0</span> characters</div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-field">
+                            <label for="proj-tech">Technologies Used</label>
+                            <input type="text" id="proj-tech" name="technologies"
+                                placeholder="Java, Spring Boot, React (comma-separated)" />
+                            <small>Separate with commas</small>
+                        </div>
+                        <div class="form-field">
+                            <label for="proj-status">Status</label>
+                            <select id="proj-status" name="status">
+                                <option value="completed">Completed</option>
+                                <option value="in-progress">In Progress</option>
+                                <option value="planning">Planning</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-field">
+                            <label for="proj-github">GitHub URL</label>
+                            <input type="url" id="proj-github" name="githubUrl" placeholder="https://github.com/..." />
+                        </div>
+                        <div class="form-field">
+                            <label for="proj-live">Live Demo URL</label>
+                            <input type="url" id="proj-live" name="liveUrl" placeholder="https://..." />
+                        </div>
+                    </div>
+                    <label class="form-check">
+                        <input type="checkbox" id="proj-featured" name="featured" />
+                        ★ Mark as Featured Project
+                    </label>
+                    <div class="form-actions-bar">
+                        <button type="button" class="btn" data-modal-close="modal-add-project">Cancel</button>
+                        <button type="submit" class="btn btn-cyan" id="proj-submit-btn">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19" />
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                            </svg>
+                            Add Project
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     MODAL: Admin Authentication
+═════════════════════════════════════════════════════════════ -->
+    <div class="auth-overlay" id="auth-overlay">
+        <div class="auth-box">
+            <h3>🔐 Admin Authentication</h3>
+            <p style="color:var(--text-dim);font-size:0.82rem;margin-bottom:1.5rem;">This action requires admin
+                credentials.</p>
+            <div class="form-field">
+                <input type="password" id="auth-password" placeholder="Enter admin password..." />
+            </div>
+            <div style="display:flex;gap:0.8rem;justify-content:center;">
+                <button class="btn" id="auth-cancel">Cancel</button>
+                <button class="btn btn-cyan" id="auth-submit">Authenticate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
+    <!-- Footer -->
+    <footer>
+        <div>
+            Engineered with <span>Java &middot; C &middot; Spring Boot &middot; Python</span>
+            &nbsp;&mdash;&nbsp;
+            <span th:text="${developerName != null ? developerName : 'Rohan Bisht'}">Rohan Bisht</span>
+        </div>
+        <div>
+            Version <span th:text="${appVersion != null ? appVersion : '1.0.0'}">1.0.0</span>
+            &nbsp;<span style="color:rgba(200,210,225,0.5);">&bull;</span>&nbsp; <span style="color:rgba(0,243,255,0.6);">WebGL Particle Matrix Active</span>
+        </div>
+    </footer>
+
+    <!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT — THREE.JS WEBGL + ALL VANILLA JS INTERACTIONS
+═════════════════════════════════════════════════════════════ -->
+    <script>
+        "use strict";
+
+        /* ═══════════════════════════════════════════════════════════
+           MODULE A: THREE.JS WARP-SPEED PARTICLE SYSTEM
+           ─────────────────────────────────────────────
+           Architecture:
+             - 6,000 particle vertices stored in a Float32Array
+               inside a THREE.BufferGeometry for maximum GPU efficiency.
+             - Each particle has an independent Z-velocity giving the
+               illusion of depth and speed differentiation.
+             - Particles move toward the camera along +Z and loop back
+               to -Z_DEPTH when they pass the camera threshold.
+             - Mouse position is tracked and used to tilt the camera
+               via smooth lerp (linear interpolation) for parallax.
+             - Second particle layer (dimmer, slower) creates depth.
+        ═══════════════════════════════════════════════════════════ */
+        (function initWebGL() {
+
+            // ── Constants ──────────────────────────────────────────
+            const PARTICLE_COUNT = 6000;   // Primary layer vertex count
+            const PARTICLE_COUNT2 = 2000;   // Secondary (background) layer
+            const SPREAD = 1800;   // XYZ spawn spread (world units)
+            const Z_DEPTH = 1000;   // Camera-to-horizon depth (world units)
+            const CAMERA_Z = 800;    // Camera resting Z position
+            const PARALLAX_FACTOR = 0.018;  // How aggressively mouse tilts camera
+            const LERP_SPEED = 0.05;   // Camera position lerp coefficient
+
+            // ── Scene ──────────────────────────────────────────────
+            const scene = new THREE.Scene();
+            // Fog: matches --void color, exponential density creates depth
+            scene.fog = new THREE.FogExp2(0x030508, 0.0008);
+
+            // ── Camera ─────────────────────────────────────────────
+            const camera = new THREE.PerspectiveCamera(
+                72,                                         // FOV (degrees)
+                window.innerWidth / window.innerHeight,     // Aspect ratio
+                0.1,                                        // Near clip plane
+                3000                                        // Far clip plane
+            );
+            camera.position.z = CAMERA_Z;
+
+            // ── Renderer ───────────────────────────────────────────
+            const renderer = new THREE.WebGLRenderer({
+                antialias: false,   // Off for performance with 8k particles
+                alpha: true         // Transparent background so CSS shows through
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Cap at 2x for perf
+            document.getElementById('webgl-container').appendChild(renderer.domElement);
+
+            // ── Particle Factory ───────────────────────────────────
+            /**
+             * createParticleLayer(count, color, size, speedMin, speedMax)
+             * Returns a THREE.Points object with BufferGeometry.
+             * Each call creates an independent set of particles with their
+             * own velocities stored in a parallel Float32Array.
+             *
+             * @param {number}  count     - Number of particles
+             * @param {number}  color     - Hex color (THREE color format)
+             * @param {number}  size      - Point size in world units
+             * @param {number}  speedMin  - Minimum Z-axis velocity per frame
+             * @param {number}  speedMax  - Maximum Z-axis velocity per frame
+             * @returns {{ mesh: THREE.Points, velocities: Float32Array }}
+             */
+            function createParticleLayer(count, color, size, speedMin, speedMax) {
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(count * 3); // x, y, z per particle
+                const velocities = new Float32Array(count);     // one scalar per particle
+
+                for (let i = 0; i < count; i++) {
+                    // Scatter uniformly across a volume
+                    positions[i * 3] = (Math.random() - 0.5) * SPREAD; // X
+                    positions[i * 3 + 1] = (Math.random() - 0.5) * SPREAD; // Y
+                    positions[i * 3 + 2] = (Math.random() - 0.5) * Z_DEPTH * 2; // Z (full range)
+
+                    // Randomize velocity within speed band
+                    velocities[i] = speedMin + Math.random() * (speedMax - speedMin);
+                }
+
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+                const material = new THREE.PointsMaterial({
+                    color: color,
+                    size: size,
+                    transparent: true,
+                    opacity: color === 0x00f3ff ? 0.85 : 0.35,
+                    blending: THREE.AdditiveBlending, // Additive = bright neon glow on overlap
+                    depthWrite: false                   // Prevents z-fighting artifacts
+                });
+
+                const mesh = new THREE.Points(geometry, material);
+                return { mesh, velocities };
+            }
+
+            // Primary layer: bright cyan, fast, large points
+            const primary = createParticleLayer(PARTICLE_COUNT, 0x00f3ff, 1.6, 1.5, 4.5);
+            // Secondary layer: faint purple, slow, tiny — creates depth parallax
+            const secondary = createParticleLayer(PARTICLE_COUNT2, 0xbc13fe, 0.8, 0.4, 1.2);
+
+            scene.add(primary.mesh);
+            scene.add(secondary.mesh);
+
+            // ── Mouse Tracking ─────────────────────────────────────
+            let mouseX = 0, mouseY = 0;
+            let targetCamX = 0, targetCamY = 0;
+            // Normalized mouse position [0,1] for per-particle depth projection
+            let mouseNormX = 0.5, mouseNormY = 0.5;
+            const ATTRACT_RADIUS = 500;     // Large radius for visible sphere effect
+            const ATTRACT_STRENGTH = 0.18;  // High pull strength
+            const ATTRACT_RETURN = 0.015;   // Gentle return to rest
+            const SPHERE_RADIUS = 80;       // Particles orbit at this distance from cursor
+
+            document.addEventListener('mousemove', (e) => {
+                mouseX = (e.clientX - window.innerWidth  / 2);
+                mouseY = (e.clientY - window.innerHeight / 2);
+                // Store normalized mouse position for per-particle depth projection
+                mouseNormX = e.clientX / window.innerWidth;
+                mouseNormY = e.clientY / window.innerHeight;
+            });
+
+            /**
+             * Project mouse into world-space at a specific particle's Z depth.
+             * This makes attraction work for particles at ANY depth, not just z=0.
+             */
+            function getMouseWorldAtZ(pz) {
+                const aspect = window.innerWidth / window.innerHeight;
+                const fovRad = (72 * Math.PI) / 180;
+                // Distance from camera to the particle's Z plane
+                const dist = CAMERA_Z - pz;
+                if (dist <= 0) return { x: 0, y: 0 };
+                const halfH = Math.tan(fovRad / 2) * dist;
+                const halfW = halfH * aspect;
+                return {
+                    x: (mouseNormX - 0.5) * halfW * 2,
+                    y: -(mouseNormY - 0.5) * halfH * 2
+                };
+            }
+
+            // ── Resize Handler ─────────────────────────────────────
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // ── Particle Advance with Spherical Attraction ─────────
+            function advanceLayer(layer, count, isSecondary) {
+                const pos = layer.mesh.geometry.attributes.position.array;
+                for (let i = 0; i < count; i++) {
+                    const idx = i * 3;
+                    // Z advance
+                    pos[idx + 2] += layer.velocities[i] * (isSecondary ? 1 : 3);
+
+                    // ── Spherical Mouse Attraction ──
+                    // Project mouse into world space at THIS particle's Z depth
+                    const mw = getMouseWorldAtZ(pos[idx + 2]);
+                    const dx = mw.x - pos[idx];
+                    const dy = mw.y - pos[idx + 1];
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < ATTRACT_RADIUS && dist > 1) {
+                        if (dist > SPHERE_RADIUS) {
+                            // Pull toward mouse (outside sphere shell)
+                            const force = ATTRACT_STRENGTH * (1 - dist / ATTRACT_RADIUS);
+                            pos[idx]     += dx * force;
+                            pos[idx + 1] += dy * force;
+                        } else {
+                            // Inside sphere: orbit around cursor (tangential force)
+                            const angle = Math.atan2(dy, dx);
+                            const tangentX = -Math.sin(angle) * 2.5;
+                            const tangentY =  Math.cos(angle) * 2.5;
+                            // Slight outward push + orbit rotation
+                            const pushOut = (SPHERE_RADIUS - dist) * 0.03;
+                            pos[idx]     += tangentX - dx * pushOut * 0.01;
+                            pos[idx + 1] += tangentY - dy * pushOut * 0.01;
+                        }
+                    }
+
+                    // Recycle at camera threshold
+                    if (pos[idx + 2] > CAMERA_Z) {
+                        pos[idx + 2] = -Z_DEPTH;
+                        pos[idx]     = (Math.random() - 0.5) * SPREAD;
+                        pos[idx + 1] = (Math.random() - 0.5) * SPREAD;
+                    }
+                }
+                layer.mesh.geometry.attributes.position.needsUpdate = true;
+            }
+
+            // ── Render Loop ────────────────────────────────────────
+            function animate() {
+                requestAnimationFrame(animate);
+
+                // Smooth camera towards mouse-derived target using linear interpolation
+                // lerp(a, b, t) = a + (b - a) * t
+                targetCamX += (mouseX * PARALLAX_FACTOR - targetCamX) * LERP_SPEED;
+                targetCamY += (-mouseY * PARALLAX_FACTOR - targetCamY) * LERP_SPEED;
+
+                camera.position.x = targetCamX;
+                camera.position.y = targetCamY;
+                camera.position.z = CAMERA_Z;
+                camera.lookAt(scene.position); // Keep camera aimed at world origin
+
+                // Advance particle Z positions with spherical mouse attraction
+                advanceLayer(primary,   PARTICLE_COUNT,  false);
+                advanceLayer(secondary, PARTICLE_COUNT2, true);
+
+                renderer.render(scene, camera);
+            }
+
+            animate();
+
+        })(); // End WebGL IIFE
+
+
+        /* ═══════════════════════════════════════════════════════════
+           MODULE B: HERO TYPING ANIMATION
+           ─────────────────────────────────────────────
+           Cycles through a sequence of status strings with a
+           character-by-character typewriter effect and natural
+           hesitation pauses. Pure vanilla, no libraries.
+        ═══════════════════════════════════════════════════════════ */
+        (function initTypingAnimation() {
+
+            const phrases = [
+                '"Seeking high-impact engineering roles"',
+                '"Available for SDE internship | full-time"',
+                '"Building systems that scale to the edge"',
+                '"Java · C · Spring Boot · Python"',
+            ];
+
+            const outputEl = document.getElementById('typing-output');
+            if (!outputEl) return;
+
+            let phraseIdx = 0;
+            let charIdx = 0;
+            let deleting = false;
+            let pauseTimer = null;
+
+            const TYPE_SPEED = 55;   // ms per character (typing)
+            const DELETE_SPEED = 28;   // ms per character (deleting, faster)
+            const PAUSE_AFTER = 2800; // ms to pause at end of phrase
+            const PAUSE_BEFORE = 400;  // ms to pause before deleting
+
+            // Cursor element lives after the text
+            const cursor = document.createElement('span');
+            cursor.className = 'cursor';
+            cursor.setAttribute('aria-hidden', 'true');
+
+            function tick() {
+                const phrase = phrases[phraseIdx];
+                const textNode = outputEl.childNodes[0]; // Text node before cursor
+
+                if (!deleting) {
+                    // ── Typing phase ──
+                    charIdx++;
+                    const displayText = phrase.substring(0, charIdx);
+
+                    outputEl.textContent = displayText;
+                    outputEl.appendChild(cursor);
+
+                    if (charIdx === phrase.length) {
+                        // Fully typed: pause before delete
+                        pauseTimer = setTimeout(() => {
+                            deleting = true;
+                            tick();
+                        }, PAUSE_AFTER);
+                        return;
+                    }
+                } else {
+                    // ── Deleting phase ──
+                    charIdx--;
+                    const displayText = phrase.substring(0, charIdx);
+
+                    outputEl.textContent = displayText;
+                    outputEl.appendChild(cursor);
+
+                    if (charIdx === 0) {
+                        // Fully deleted: advance to next phrase
+                        deleting = false;
+                        phraseIdx = (phraseIdx + 1) % phrases.length;
+
+                        pauseTimer = setTimeout(tick, PAUSE_BEFORE);
+                        return;
+                    }
+                }
+
+                setTimeout(tick, deleting ? DELETE_SPEED : TYPE_SPEED);
+            }
+
+            // Seed with cursor immediately
+            outputEl.appendChild(cursor);
+            setTimeout(tick, 900); // Initial delay before starting
+
+        })();
+
+
+        /* ═══════════════════════════════════════════════════════════
+           MODULE C: INTERSECTION OBSERVER — SCROLL REVEALS
+           ─────────────────────────────────────────────
+           Watches .fade-up elements. When they enter the viewport,
+           adds .visible which triggers CSS transitions.
+           Also triggers skill bar animations.
+        ═══════════════════════════════════════════════════════════ */
+        (function initScrollReveal() {
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+
+                        // If this is a skill cell, animate its bar fill
+                        const bar = entry.target.querySelector('.skill-bar-fill');
+                        if (bar) {
+                            const fill = parseFloat(bar.dataset.fill || '0.75');
+                            bar.style.transform = `scaleX(${fill})`;
+                        }
+
+                        observer.unobserve(entry.target); // Fire once only
+                    }
+                });
+            }, {
+                threshold: 0.12, // Trigger when 12% is visible
+                rootMargin: '0px 0px -40px 0px'
+            });
+
+            document.querySelectorAll('.fade-up, .skill-cell').forEach(el => {
+                observer.observe(el);
+            });
+
+        })();
+
+
+        /* ═══════════════════════════════════════════════════════════
+           MODULE D: TOAST NOTIFICATION HELPER
+        ═══════════════════════════════════════════════════════════ */
+        const Toast = (() => {
+            const el = document.getElementById('toast');
+            let timer;
+
+            return {
+                /**
+                 * Show a toast message.
+                 * @param {string} msg      - Message text
+                 * @param {number} duration - Auto-hide after ms (default 2400)
+                 */
+                show(msg, duration = 2400) {
+                    clearTimeout(timer);
+                    el.textContent = msg;
+                    el.classList.add('show');
+                    timer = setTimeout(() => el.classList.remove('show'), duration);
+                }
+            };
+        })();
+
+
+        /* ═══════════════════════════════════════════════════════════
+           MODULE E: ENGAGEMENT BAR — LIKE SYSTEM
+           ─────────────────────────────────────────────
+           Sends an async POST /api/projects/{id}/like.
+           On 200 OK, increments the DOM counter and marks
+           the button as liked (prevents double-like).
+           Optimistic UI update applied immediately,
+           rolled back if the server returns an error.
+        ═══════════════════════════════════════════════════════════ */
+        (function initLikeSystem() {
+
+            // Set of project IDs already liked in this session (client-side guard)
+            const likedSet = new Set(
+                JSON.parse(sessionStorage.getItem('likedProjects') || '[]')
+            );
+
+            // Persist to sessionStorage so page-refresh doesn't reset
+            function persistLiked() {
+                sessionStorage.setItem('likedProjects', JSON.stringify([...likedSet]));
+            }
+
+            // Restore liked state on DOM load
+            likedSet.forEach(id => {
+                const btn = document.querySelector(`.btn-like[data-id="${id}"]`);
+                if (btn) btn.classList.add('liked');
+            });
+
+            /**
+             * handleLike(projectId, buttonEl)
+             * ─────────────────────────────────
+             * 1. Guard: reject if already liked or request in flight
+             * 2. Optimistic update: +1 count, apply .liked class
+             * 3. POST /api/projects/{id}/like
+             * 4. On success: confirm with server count if provided in response
+             * 5. On failure: rollback DOM change, show error toast
+             *
+             * @param {string}      projectId - Project identifier
+             * @param {HTMLElement} btn       - The clicked button element
+             */
+            async function handleLike(projectId, btn) {
+                if (likedSet.has(projectId)) {
+                    Toast.show('Already liked this project ✓');
+                    return;
+                }
+                if (btn.classList.contains('loading')) return;
+
+                // ─ Optimistic UI ─
+                const counterEl = btn.querySelector('.like-count');
+                const prevCount = parseInt(counterEl?.textContent || '0', 10);
+                const newCount = prevCount + 1;
+
+                btn.classList.add('loading', 'liked');
+                if (counterEl) counterEl.textContent = newCount;
+                likedSet.add(projectId);
+                persistLiked();
+
+                try {
+                    const response = await fetch(`/api/projects/${projectId}/like`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            // Include CSRF token if Spring Security is active
+                            // Reads from meta tag: <meta name="_csrf" th:content="${_csrf.token}">
+                            'X-CSRF-TOKEN': document
+                                .querySelector('meta[name="_csrf"]')?.content || ''
+                        },
+                        body: JSON.stringify({ projectId })
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    // Server may return the authoritative count
+                    const data = await response.json().catch(() => ({}));
+                    if (data?.likeCount !== undefined && counterEl) {
+                        counterEl.textContent = data.likeCount;
+                    }
+
+                    Toast.show('Liked! ♥');
+
+                } catch (err) {
+                    // ─ Rollback on failure ─
+                    if (counterEl) counterEl.textContent = prevCount;
+                    btn.classList.remove('liked');
+                    likedSet.delete(projectId);
+                    persistLiked();
+
+                    console.error('[LikeSystem] POST failed:', err);
+                    Toast.show('Could not reach server — try again.', 3000);
+
+                } finally {
+                    btn.classList.remove('loading');
+                }
+            }
+
+            // Event delegation on document for all current & future .btn-like elements
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-like');
+                if (!btn) return;
+                e.preventDefault();
+                handleLike(btn.dataset.id, btn);
+            });
+
+        })();
+
+
+        /* ═══════════════════════════════════════════════════════════
+           MODULE F: ENGAGEMENT BAR — SHARE DROPDOWN
+        ═══════════════════════════════════════════════════════════ */
+        (function initShareDropdowns() {
+
+            // Toggle share menu open/closed on button click
+            document.addEventListener('click', (e) => {
+                const shareBtn = e.target.closest('.btn-share');
+
+                // Close all menus first
+                document.querySelectorAll('.share-menu.open').forEach(menu => {
+                    if (!shareBtn || menu.id !== `share-menu-${shareBtn.dataset.id}`) {
+                        menu.classList.remove('open');
+                        menu.previousElementSibling?.setAttribute('aria-expanded', 'false');
+                    }
+                });
+
+                if (!shareBtn) return;
+                e.stopPropagation();
+
+                const menu = document.getElementById(`share-menu-${shareBtn.dataset.id}`);
+                if (!menu) return;
+
+                const isOpen = menu.classList.toggle('open');
+                shareBtn.setAttribute('aria-expanded', String(isOpen));
+            });
+
+            // Copy link handler inside share menus
+            document.addEventListener('click', async (e) => {
+                const copyLink = e.target.closest('.share-copy-link');
+                if (!copyLink) return;
+                e.preventDefault();
+
+                const url = window.location.origin + (copyLink.dataset.shareUrl || window.location.pathname);
+                try {
+                    await navigator.clipboard.writeText(url);
+                    Toast.show('Link copied to clipboard ✓');
+                } catch {
+                    Toast.show('Copy failed — use Ctrl+C manually');
+                }
+
+                // Close parent menu
+                copyLink.closest('.share-menu')?.classList.remove('open');
+            });
+
+        })();
+
+
+        /* ═══════════════════════════════════════════════════════════
+           MODULE G: ENGAGEMENT BAR — COMMENTS
+           ─────────────────────────────────────────────
+           Toggles the comment panel and sends POST requests
+           to /api/projects/{id}/comment. Comments render
+           into the DOM without page reload.
+        ═══════════════════════════════════════════════════════════ */
+        (function initCommentSystem() {
+
+            // Toggle comment panel visibility
+            document.addEventListener('click', (e) => {
+                const commentBtn = e.target.closest('.btn-comment:not(.btn-comment-submit)');
+                if (!commentBtn) return;
+
+                const id = commentBtn.dataset.id;
+                const panel = document.getElementById(`comments-${id}`);
+                if (!panel) return;
+
+                const isOpen = panel.classList.toggle('open');
+                commentBtn.setAttribute('aria-expanded', String(isOpen));
+
+                if (isOpen) {
+                    // Focus the input after opening
+                    setTimeout(() => {
+                        document.getElementById(`comment-field-${id}`)?.focus();
+                    }, 150);
+                }
+            });
+
+            /**
+             * submitComment(projectId, text)
+             * Sends POST /api/projects/{id}/comment and prepends the
+             * new comment to the list if the server confirms.
+             *
+             * @param {string} projectId
+             * @param {string} text
+             * @param {HTMLElement} submitBtn
+             */
+            async function submitComment(projectId, text, submitBtn) {
+                if (!text.trim()) return;
+
+                submitBtn.classList.add('loading');
+
+                try {
+                    const response = await fetch(`/api/projects/${projectId}/comment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ projectId, body: text.trim() })
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const data = await response.json().catch(() => ({}));
+
+                    // Render the new comment into DOM
+                    const list = document.getElementById(`comments-list-${projectId}`);
+                    if (list) {
+                        // Remove "no comments" placeholder
+                        const placeholder = list.querySelector('li[style]');
+                        if (placeholder) placeholder.remove();
+
+                        const li = document.createElement('li');
+                        const author = document.createElement('span');
+                        author.className = 'comment-author';
+                        author.textContent = data.author || 'you';
+                        li.appendChild(author);
+                        li.appendChild(document.createTextNode(' ' + (data.body || text.trim())));
+                        list.prepend(li);
+                    }
+
+                    // Clear input
+                    const field = document.getElementById(`comment-field-${projectId}`);
+                    if (field) field.value = '';
+
+                    Toast.show('Comment posted ✓');
+
+                } catch (err) {
+                    console.error('[CommentSystem] POST failed:', err);
+                    Toast.show('Comment failed — check your connection', 3000);
+                } finally {
+                    submitBtn.classList.remove('loading');
+                }
+            }
+
+            // Submit on button click
+            document.addEventListener('click', (e) => {
+                const submitBtn = e.target.closest('.btn-comment-submit');
+                if (!submitBtn) return;
+
+                const id = submitBtn.dataset.id;
+                const field = document.getElementById(`comment-field-${id}`);
+                if (field) submitComment(id, field.value, submitBtn);
+            });
+
+            // Submit on Enter key in the comment field
+            document.addEventListener('keydown', (e) => {
+                if (e.key !== 'Enter') return;
+                const field = e.target.closest('.comment-field');
+                if (!field) return;
+
+                // Extract project ID from field's id: "comment-field-{id}"
+                const id = field.id.replace('comment-field-', '');
+                const submitBtn = document.querySelector(`.btn-comment-submit[data-id="${id}"]`);
+                if (submitBtn) submitComment(id, field.value, submitBtn);
+            });
+
+        })();
+
+
+        /* ═══════════════════════════════════════════════════════════
+           MODULE H: LIVE EXECUTION TERMINAL
+           ─────────────────────────────────────────────
+           A fully interactive terminal UI module that:
+           1. Handles built-in commands locally (help, clear, whoami…)
+           2. For project run commands, sends a POST to
+              /api/terminal/execute (the Spring Boot endpoint)
+           3. Maintains a command history (↑↓ to navigate)
+           4. Prepares WebSocket connection for real-time stdout
+              streaming (hooks are in place but connection is
+              intentionally idle until backend is ready).
+    
+           WebSocket endpoint expected:  ws://host/ws/terminal
+           REST fallback endpoint:       POST /api/terminal/execute
+        ═══════════════════════════════════════════════════════════ */
+        (function initTerminal() {
+
+            const output = document.getElementById('terminal-output');
+            const input = document.getElementById('terminal-input');
+            const runBtn = document.getElementById('btn-run');
+            const clearBtn = document.getElementById('btn-clear-terminal');
+            const wsDot = document.getElementById('ws-dot');
+            const wsLabel = document.getElementById('ws-status-label');
+
+            if (!output || !input) return;
+
+            // ── Command History ──────────────────────────────────
+            const history = [];
+            let histIndex = -1;
+
+            // ── WebSocket State ──────────────────────────────────
+            let ws = null;
+
+            /**
+             * connectWebSocket()
+             * Attempts to open a WebSocket to /ws/terminal.
+             * Updates the status indicator in the chrome bar.
+             * Falls back gracefully if WebSocket is unavailable.
+             */
+            function connectWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                const wsUrl = `${protocol}://${window.location.host}/ws/terminal`;
+
+                try {
+                    ws = new WebSocket(wsUrl);
+
+                    ws.onopen = () => {
+                        wsDot.classList.add('connected');
+                        wsLabel.textContent = 'WebSocket: Live';
+                        appendLine('info', '[ws] Connection established — live output active.');
+                    };
+
+                    ws.onmessage = (event) => {
+                        appendLine('output', event.data);
+                        scrollToBottom();
+                    };
+
+                    ws.onclose = () => {
+                        wsDot.classList.remove('connected');
+                        wsLabel.textContent = 'WebSocket: Closed';
+                        appendLine('warn', '[ws] Connection closed. Commands will use REST fallback.');
+                    };
+
+                    ws.onerror = () => {
+                        wsDot.classList.remove('connected');
+                        wsLabel.textContent = 'WebSocket: Error';
+                        // Silent — don't spam the terminal for expected offline env
+                    };
+
+                } catch (e) {
+                    // WebSocket unavailable (e.g., HTTP-only dev server)
+                    wsLabel.textContent = 'WebSocket: N/A';
+                }
+            }
+
+            // ── DOM Helpers ──────────────────────────────────────
+            function timestamp() {
+                return new Date().toLocaleTimeString('en-US', { hour12: false });
+            }
+
+            /**
+             * appendLine(type, text)
+             * Adds a line to the terminal output pre block.
+             * type: 'input' | 'output' | 'success' | 'error' | 'info' | 'warn'
+             */
+            function appendLine(type, text) {
+                const line = document.createElement('div');
+                line.className = 'term-line';
+
+                if (type === 'input') {
+                    // User-typed command — show with prompt symbol
+                    line.innerHTML =
+                        `<span class="term-ts">${timestamp()}</span>` +
+                        `<span class="term-prompt-sym">$</span>` +
+                        `<span class="term-text output">${escHtml(text)}</span>`;
+                } else {
+                    line.innerHTML =
+                        `<span class="term-ts">${timestamp()}</span>` +
+                        `<span class="term-prompt-sym">&gt;</span>` +
+                        `<span class="term-text ${type}">${escHtml(text)}</span>`;
+                }
+
+                output.appendChild(line);
+                scrollToBottom();
+            }
+
+            function scrollToBottom() {
+                output.scrollTop = output.scrollHeight;
+            }
+
+            function escHtml(str) {
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            }
+
+            // ── Built-in Commands ────────────────────────────────
+            const COMMANDS = {
+                help() {
+                    const cmds = [
+                        '  help          — Show available commands',
+                        '  whoami        — Display developer profile',
+                        '  ls            — List projects',
+                        '  skills        — Show tech stack',
+                        '  run <project> — Execute project on server',
+                        '  clear         — Clear terminal output',
+                        '  status        — Show system status',
+                        '  contact       — Display contact info',
+                    ];
+                    cmds.forEach(c => appendLine('info', c));
+                },
+
+                whoami() {
+                    appendLine('output', 'Developer: Rohan Bisht');
+                    appendLine('output', 'Role     : Java Developer');
+                    appendLine('output', 'Focus    : Java · C · Python · Spring Boot');
+                    appendLine('output', 'Node     : portfolio.local (Spring Boot 3.x)');
+                },
+
+                ls() {
+                    appendLine('output', 'Available projects:');
+                    appendLine('output', '  [demo-1] ATM Simulator');
+                    appendLine('output', '  [demo-2] Portfolio');
+                    appendLine('output', '  [demo-3] Smart Macro Recorder');
+                    appendLine('info', 'Usage: run <project-id>');
+                },
+
+                skills() {
+                    const stack = [
+                        'Languages : C++17 · Python 3.11 · Java 21',
+                        'Backend   : Spring Boot 3 · PostgreSQL · Redis · Kafka',
+                        'ML        : PyTorch · LightGBM · scikit-learn · NumPy',
+                        'Engine    : OpenGL · GLFW · ECS · GJK · BVH',
+                        'DevOps    : Docker · GitHub Actions · Maven · CMake',
+                    ];
+                    stack.forEach(s => appendLine('output', s));
+                },
+
+                status() {
+                    appendLine('success', 'System status: ONLINE');
+                    appendLine('output', 'WebGL renderer  : Active (6000 particles)');
+                    appendLine('output', 'Spring Boot     : Running on port 8080');
+                    appendLine('output', 'Database        : Connected (PostgreSQL)');
+                    appendLine(wsDot.classList.contains('connected') ? 'success' : 'warn',
+                        `WebSocket       : ${wsDot.classList.contains('connected') ? 'Connected' : 'Idle'}`);
+                },
+
+                contact() {
+                    appendLine('output', 'Email   : hello@adityasharma.dev');
+                    appendLine('output', 'GitHub  : github.com/adityasharma');
+                    appendLine('output', 'LinkedIn: linkedin.com/in/adityasharma');
+                },
+
+                clear() {
+                    // Preserve boot instructions — only clear user output
+                    const children = Array.from(output.children);
+                    // Keep the first N boot lines (everything before the first user prompt)
+                    const bootLineCount = 8; // Number of boot sequence lines
+                    if (children.length > bootLineCount) {
+                        children.slice(bootLineCount).forEach(el => el.remove());
+                    }
+                }
+            };
+
+            // ── Remote Execution via REST ─────────────────────────
+            /**
+             * executeRemote(command)
+             * POSTs to /api/terminal/execute.
+             * Expected JSON body: { command: string }
+             * Expected JSON response: { output: string[], exitCode: number }
+             */
+            async function executeRemote(command) {
+                appendLine('info', `[exec] Dispatching to server: ${command}`);
+
+                try {
+                    const response = await fetch('/api/terminal/execute', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ command })
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const data = await response.json();
+
+                    // Render multi-line output
+                    (data.output || ['[no output]']).forEach(line => {
+                        appendLine('output', line);
+                    });
+
+                    if (data.exitCode === 0) {
+                        appendLine('success', `[exec] Process exited with code 0`);
+                    } else {
+                        appendLine('error', `[exec] Process exited with code ${data.exitCode}`);
+                    }
+
+                } catch (err) {
+                    appendLine('error', `[exec] Server unreachable: ${err.message}`);
+                    appendLine('warn', '[exec] Is Spring Boot running on localhost:8080?');
+                }
+            }
+
+            // ── Command Dispatch ─────────────────────────────────
+            function dispatch(raw) {
+                const trimmed = raw.trim();
+                if (!trimmed) return;
+
+                appendLine('input', trimmed);
+
+                // Push to history
+                history.unshift(trimmed);
+                if (history.length > 100) history.pop();
+                histIndex = -1;
+
+                const [cmd, ...args] = trimmed.toLowerCase().split(/\s+/);
+
+                if (cmd in COMMANDS) {
+                    COMMANDS[cmd](args);
+                } else if (cmd === 'run') {
+                    const projectId = args[0];
+                    if (!projectId) {
+                        appendLine('error', 'Usage: run <project-id>');
+                        return;
+                    }
+                    // If WebSocket is live, server will push output directly
+                    // Otherwise fall back to REST
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: 'execute', projectId }));
+                        appendLine('info', '[ws] Command dispatched via WebSocket stream.');
+                    } else {
+                        executeRemote(`run ${projectId}`);
+                    }
+                } else {
+                    appendLine('error', `Command not found: ${cmd}`);
+                    appendLine('output', "Type 'help' for available commands.");
+                }
+            }
+
+            // ── Input Event Handlers ─────────────────────────────
+            runBtn.addEventListener('click', () => {
+                dispatch(input.value);
+                input.value = '';
+            });
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    dispatch(input.value);
+                    input.value = '';
+                    return;
+                }
+
+                // History navigation: ↑ / ↓
+                if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    histIndex = Math.min(histIndex + 1, history.length - 1);
+                    input.value = history[histIndex] || '';
+                }
+
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    histIndex = Math.max(histIndex - 1, -1);
+                    input.value = histIndex === -1 ? '' : history[histIndex];
+                }
+            });
+
+            clearBtn.addEventListener('click', () => {
+                // Same as clear command — preserve boot lines
+                const children = Array.from(output.children);
+                const bootLineCount = 8;
+                if (children.length > bootLineCount) {
+                    children.slice(bootLineCount).forEach(el => el.remove());
+                }
+            });
+
+            // ── Boot Sequence ────────────────────────────────────
+            function bootSequence() {
+                const lines = [
+                    { type: 'info', text: '╔══════════════════════════════════════════╗' },
+                    { type: 'info', text: '║    SDE Portfolio — Execution Environment  ║' },
+                    { type: 'info', text: '║    Spring Boot 3.x | Thymeleaf | WebGL    ║' },
+                    { type: 'info', text: '╚══════════════════════════════════════════╝' },
+                    { type: 'success', text: 'System boot: OK' },
+                    { type: 'output', text: 'Kernel: Linux 6.1.0-portfolio #1 SMP x86_64' },
+                    { type: 'output', text: 'WebGL renderer initialized — 6000 vertices active' },
+                    { type: 'warn', text: 'WebSocket endpoint /ws/terminal is awaiting backend.' },
+                    { type: 'info', text: "Type 'help' to explore available commands." },
+                ];
+
+                lines.forEach((line, i) => {
+                    setTimeout(() => appendLine(line.type, line.text), i * 80);
+                });
+
+                // Attempt WebSocket connection after boot
+                setTimeout(connectWebSocket, lines.length * 80 + 200);
+            }
+
+            bootSequence();
+            input.focus();
+
+        })();
+
+    </script>
+
+    <!-- Consolidated Modules: Blog, Projects, Admin, Modals -->
+    <script src="/js/portfolio.js"></script>
+
 </body>
+
 </html>
