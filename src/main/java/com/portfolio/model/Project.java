@@ -33,6 +33,7 @@ public class Project {
     @Column(name = "tech")
     private List<String> techStack = new ArrayList<>();
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<ProjectComment> comments = new ArrayList<>();
 

@@ -171,10 +171,6 @@ function logout(){localStorage.removeItem('adminToken');adminToken=null;Toast.sh
    MODULE N: DOWNLOAD RESUME HANDLER
 ═══════════════════════════════════════════════════════════ */
 document.getElementById('btn-download-resume')?.addEventListener('click',e=>{
-    // If no resume file is available at /resume, show a toast
-    e.preventDefault();
-    fetch('/resume',{method:'HEAD'}).then(r=>{
-        if(r.ok) window.location.href='/resume';
-        else Toast.show('Resume not uploaded yet — add resume.pdf to static folder',3000);
-    }).catch(()=>Toast.show('Resume not available',3000));
+    // Smoothly initiate download
+    Toast.show('Downloading Rohan Bisht\'s Resume...');
 });
