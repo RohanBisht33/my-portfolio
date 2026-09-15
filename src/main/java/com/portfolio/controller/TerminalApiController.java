@@ -25,6 +25,7 @@ public class TerminalApiController {
         }
 
         String lower = command.toLowerCase();
+        String[] rawParts = command.split("\\s+");
         String[] parts = lower.split("\\s+");
         String base = parts[0];
 
@@ -32,16 +33,19 @@ public class TerminalApiController {
             output.add("╔══════════════════════════════════════════════════════════╗");
             output.add("║      ROHAN BISHT — SDE EXECUTION RUNTIME V2.0            ║");
             output.add("╚══════════════════════════════════════════════════════════╝");
-            output.add("  help              — Display available console commands");
-            output.add("  whoami            — Display Rohan Bisht's profile");
-            output.add("  skills            — Print categorized technical skills");
-            output.add("  ls                — List deployed portfolio projects");
-            output.add("  run <project>     — Execute project simulation & test suite");
-            output.add("  education         — View academic credentials");
-            output.add("  certs             — View certifications and awards");
-            output.add("  contact           — Print verified contact channels");
-            output.add("  status            — Display JVM, database & cloud health");
-            output.add("  clear             — Reset terminal console");
+            output.add("  help                     — Display available console commands");
+            output.add("  whoami                   — Display Rohan Bisht's profile");
+            output.add("  skills                   — Print categorized technical skills");
+            output.add("  ls                       — List deployed portfolio projects");
+            output.add("  run <project>            — Execute project simulation & test suite");
+            output.add("  education                — View academic credentials");
+            output.add("  certs                    — View certifications and awards");
+            output.add("  contact                  — Print verified contact channels");
+            output.add("  status                   — Display JVM, database & cloud health");
+            output.add("  login <user> <password>  — Authenticate administrator session");
+            output.add("  logout                   — Exit administrator session");
+            output.add("  add project              — Open project creation dialog");
+            output.add("  clear                    — Reset terminal console");
         } else if (base.equals("whoami")) {
             output.add("Developer  : Rohan Bisht");
             output.add("Role       : Java Backend Developer / SDE");
@@ -109,6 +113,48 @@ public class TerminalApiController {
             output.add("Database             : PostgreSQL relational mode active");
             output.add("WebSocket            : Active at /ws/terminal");
             output.add("Container Registry   : Azure Container Registry (ACR) connected");
+        } else if (base.equals("login")) {
+            if (rawParts.length < 3) {
+                output.add("[auth] Usage: login <username> <password>");
+                output.add("[auth] Example: login imrb rb@123");
+                exitCode = 1;
+            } else {
+                String username = rawParts[1];
+                String password = rawParts[2];
+                if ("imrb".equalsIgnoreCase(username) && "rb@123".equals(password)) {
+                    String token = "adm_" + UUID.randomUUID().toString().substring(0, 8);
+                    output.add("[auth] ══════════════════════════════════════════════");
+                    output.add("[auth] ACCESS GRANTED. Welcome Rohan Bisht (@sys.rb)");
+                    output.add("[auth] Administrator session authenticated.");
+                    output.add("[auth] 'Add Project' controls are now active across the site.");
+                    output.add("[auth] ══════════════════════════════════════════════");
+                    Map<String, Object> resp = new HashMap<>();
+                    resp.put("output", output);
+                    resp.put("exitCode", 0);
+                    resp.put("authenticated", true);
+                    resp.put("token", token);
+                    resp.put("username", "imrb");
+                    return ResponseEntity.ok(resp);
+                } else {
+                    output.add("[auth] ACCESS DENIED: Invalid credentials.");
+                    exitCode = 1;
+                }
+            }
+        } else if (base.equals("logout")) {
+            output.add("[auth] Administrator session terminated.");
+            output.add("[auth] 'Add Project' controls locked and hidden.");
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("output", output);
+            resp.put("exitCode", 0);
+            resp.put("loggedOut", true);
+            return ResponseEntity.ok(resp);
+        } else if (command.equalsIgnoreCase("add project") || command.equalsIgnoreCase("add-project")) {
+            output.add("[action] Opening Add Project dialog...");
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("output", output);
+            resp.put("exitCode", 0);
+            resp.put("openAddProjectModal", true);
+            return ResponseEntity.ok(resp);
         } else {
             output.add("[error] Unknown command: " + base);
             output.add("Type 'help' to inspect available commands.");

@@ -1730,7 +1730,7 @@
     <nav class="topbar" aria-label="Primary navigation">
         <div class="topbar-logo">
             <!-- Thymeleaf: ${developerHandle} or fallback -->
-            <span th:text="${developerHandle != null ? developerHandle : '@sys.architect'}">@sys.architect</span>
+            <span th:text="${developerHandle != null ? developerHandle : '@sys.rb'}">@sys.rb</span>
         </div>
         <div class="topbar-status">
             <div class="status-dot" aria-hidden="true"></div>
@@ -1824,7 +1824,7 @@
                     </svg>
                     View Projects
                 </a>
-                <button class="btn btn-purple" id="btn-add-project">
+                <button class="btn btn-purple admin-only" id="btn-add-project" style="display:none;" title="Admin privilege active">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         aria-hidden="true">
                         <line x1="12" y1="5" x2="12" y2="19" />
@@ -1963,7 +1963,7 @@
                 <div class="section-rule" aria-hidden="true"></div>
             </div>
 
-            <div style="margin-bottom:1.5rem;" class="fade-up delay-1">
+            <div style="margin-bottom:1.5rem;display:none;" class="fade-up delay-1 admin-only" id="add-project-wrapper">
                 <button class="btn btn-purple" id="btn-add-project-section">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19" />
@@ -3202,16 +3202,19 @@
             const COMMANDS = {
                 help() {
                     const cmds = [
-                        '  help          — Show available commands',
-                        '  whoami        — Display developer profile',
-                        '  ls            — List deployed projects',
-                        '  skills        — Show technical competencies',
-                        '  run <project> — Execute project test suite (nexstore / atm-simulator)',
-                        '  education     — View university & school credentials',
-                        '  certs         — View certifications and awards',
-                        '  contact       — Display direct contact information',
-                        '  status        — Show runtime system health',
-                        '  clear         — Clear terminal output',
+                        '  help                    — Show available commands',
+                        '  whoami                  — Display developer profile',
+                        '  ls                      — List deployed projects',
+                        '  skills                  — Show technical competencies',
+                        '  run <project>           — Execute project test suite (nexstore / atm-simulator)',
+                        '  education               — View university & school credentials',
+                        '  certs                   — View certifications and awards',
+                        '  contact                 — Display direct contact information',
+                        '  status                  — Show runtime system health',
+                        '  login <user> <password> — Unlock administrator session (login imrb rb@123)',
+                        '  logout                  — Exit administrator session and lock controls',
+                        '  add project             — Open project creation dialog (Admin)',
+                        '  clear                   — Clear terminal output',
                     ];
                     cmds.forEach(c => appendLine('info', c));
                 },
@@ -3309,6 +3312,38 @@
                         appendLine('output', line);
                     });
 
+                    // Admin Session State Updates
+                    if (data.authenticated) {
+                        localStorage.setItem('adminToken', data.token || 'adm_session');
+                        if (typeof window.updateAdminVisibility === 'function') {
+                            window.updateAdminVisibility();
+                        }
+                        if (typeof Toast !== 'undefined') {
+                            Toast.show('Admin mode unlocked! "Add Project" is now visible.');
+                        }
+                    }
+
+                    if (data.loggedOut) {
+                        localStorage.removeItem('adminToken');
+                        if (typeof window.updateAdminVisibility === 'function') {
+                            window.updateAdminVisibility();
+                        }
+                        if (typeof Toast !== 'undefined') {
+                            Toast.show('Logged out. "Add Project" hidden.');
+                        }
+                    }
+
+                    if (data.openAddProjectModal) {
+                        const token = localStorage.getItem('adminToken');
+                        if (token) {
+                            if (typeof window.openModal === 'function') {
+                                window.openModal('modal-add-project');
+                            }
+                        } else {
+                            appendLine('warn', '[auth] Please login first via: login imrb rb@123');
+                        }
+                    }
+
                     if (data.exitCode === 0) {
                         appendLine('success', `[exec] Process exited with code 0`);
                     } else {
@@ -3335,7 +3370,9 @@
 
                 const [cmd, ...args] = trimmed.toLowerCase().split(/\s+/);
 
-                if (cmd in COMMANDS) {
+                if (cmd === 'login' || cmd === 'logout' || trimmed.toLowerCase().startsWith('add project') || trimmed.toLowerCase() === 'add-project') {
+                    executeRemote(trimmed);
+                } else if (cmd in COMMANDS) {
                     COMMANDS[cmd](args);
                 } else if (cmd === 'run') {
                     const projectId = args[0];

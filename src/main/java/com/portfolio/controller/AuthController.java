@@ -15,11 +15,22 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
-        String password = body.get("password");
-        if (password != null && (password.equals(ADMIN_PASSWORD) || password.equals("admin123") || password.equals("rohan"))) {
+        String username = body.getOrDefault("username", "").trim();
+        String password = body.getOrDefault("password", "").trim();
+
+        // Support login with username=imrb & password=rb@123 (and backward compatibility for password only)
+        if (("imrb".equalsIgnoreCase(username) && "rb@123".equals(password))
+                || ("rb@123".equals(password))
+                || ("admin".equals(password))
+                || ("admin123".equals(password))) {
             String token = "adm_" + UUID.randomUUID().toString().substring(0, 8);
-            return ResponseEntity.ok(Map.of("token", token, "message", "Authenticated successfully"));
+            return ResponseEntity.ok(Map.of(
+                    "token", token,
+                    "username", username.isEmpty() ? "imrb" : username,
+                    "role", "ADMIN",
+                    "message", "Authenticated successfully"
+            ));
         }
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid password"));
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"));
     }
 }

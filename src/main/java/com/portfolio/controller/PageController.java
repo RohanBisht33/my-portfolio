@@ -26,7 +26,7 @@ public class PageController {
         List<Project> projects = projectRepository.findAllByOrderByCreatedAtDesc();
         model.addAttribute("projects", projects);
         model.addAttribute("developerName", "Rohan Bisht");
-        model.addAttribute("developerHandle", "@sys.architect");
+        model.addAttribute("developerHandle", "@sys.rb");
         model.addAttribute("appVersion", "2.0.0");
         return "index";
     }

@@ -29,44 +29,55 @@ document.getElementById('hamburger-btn')?.addEventListener('click',()=>document.
 document.getElementById('mobile-nav-close')?.addEventListener('click',()=>document.getElementById('mobile-nav')?.classList.remove('open'));
 document.querySelectorAll('.mobile-nav-link').forEach(a=>a.addEventListener('click',()=>document.getElementById('mobile-nav')?.classList.remove('open')));
 
-/* ─── Admin Auth ────────────────────────────────────────── */
+/* ─── Admin Auth & Visibility ────────────────────────── */
 let adminToken = localStorage.getItem('adminToken') || null;
 let pendingAdminAction = null;
 
+window.openModal = openModal;
+window.closeModal = closeModal;
+
+window.updateAdminVisibility = function(){
+    adminToken = localStorage.getItem('adminToken') || null;
+    const isAdmin = !!adminToken;
+    document.querySelectorAll('.admin-only').forEach(el=>{
+        el.style.display = isAdmin ? '' : 'none';
+    });
+};
+
+// Initialize visibility immediately and on DOM load
+window.updateAdminVisibility();
+document.addEventListener('DOMContentLoaded', window.updateAdminVisibility);
+
 function requireAuth(callback){
+    adminToken = localStorage.getItem('adminToken') || null;
     if(adminToken){callback();return;}
     pendingAdminAction=callback;
-    document.getElementById('auth-overlay')?.classList.add('open');
-    setTimeout(()=>document.getElementById('auth-password')?.focus(),200);
+    Toast.show('Type \'login imrb rb@123\' in terminal to unlock Add Project', 3500);
 }
 
 document.getElementById('auth-submit')?.addEventListener('click',async()=>{
     const pw=document.getElementById('auth-password')?.value;
-    if(!pw){Toast.show('Enter a password');return;}
+    if(!pw){Toast.show('Enter password');return;}
     try{
-        const r=await fetch(`${API}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw})});
+        const r=await fetch(`${API}/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'imrb',password:pw})});
         if(r.ok){
             const d=await r.json();
-            adminToken=d.token||pw;localStorage.setItem('adminToken',adminToken);
+            adminToken=d.token||'adm_session';localStorage.setItem('adminToken',adminToken);
+            window.updateAdminVisibility();
             document.getElementById('auth-overlay')?.classList.remove('open');
             Toast.show('Authenticated ✓');if(pendingAdminAction)pendingAdminAction();
         } else {
-            // Fallback: accept a hardcoded local password for dev
-            if(pw==='admin123'){adminToken=pw;localStorage.setItem('adminToken',adminToken);document.getElementById('auth-overlay')?.classList.remove('open');Toast.show('Authenticated (dev mode) ✓');if(pendingAdminAction)pendingAdminAction();}
-            else Toast.show('Invalid password',3000);
+            Toast.show('Invalid password — use terminal: login imrb rb@123',3000);
         }
     }catch{
-        // Server unreachable: allow dev password
-        if(pw==='admin123'){adminToken=pw;localStorage.setItem('adminToken',adminToken);document.getElementById('auth-overlay')?.classList.remove('open');Toast.show('Authenticated (offline) ✓');if(pendingAdminAction)pendingAdminAction();}
-        else Toast.show('Auth failed — server unreachable',3000);
+        Toast.show('Auth failed — use terminal: login imrb rb@123',3000);
     }
 });
 document.getElementById('auth-cancel')?.addEventListener('click',()=>{document.getElementById('auth-overlay')?.classList.remove('open');pendingAdminAction=null;});
 document.getElementById('auth-password')?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('auth-submit')?.click();});
 
 function authHeaders(){return adminToken?{'Authorization':`Bearer ${adminToken}`}:{};}
-function logout(){localStorage.removeItem('adminToken');adminToken=null;Toast.show('Logged out');}
-
+function logout(){localStorage.removeItem('adminToken');adminToken=null;window.updateAdminVisibility();Toast.show('Logged out');}
 
 /* ═══════════════════════════════════════════════════════════
    MODULE J: ADD PROJECT BUTTONS — Wire up all triggers

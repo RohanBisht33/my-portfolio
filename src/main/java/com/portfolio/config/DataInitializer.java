@@ -38,7 +38,7 @@ public class DataInitializer {
                 nexstore.setFeatured(true);
                 nexstore.setLiveUrl("https://nexstore.azurewebsites.net");
                 nexstore.setGithubUrl("https://github.com/RohanBisht33");
-                nexstore.setLikeCount(48);
+                nexstore.setLikeCount(0);
 
                 // Project 2: Enterprise ATM Simulator
                 Project atmSimulator = new Project();
@@ -57,9 +57,22 @@ public class DataInitializer {
                 atmSimulator.setStatus("completed");
                 atmSimulator.setFeatured(true);
                 atmSimulator.setGithubUrl("https://github.com/RohanBisht33/atm-simulator");
-                atmSimulator.setLikeCount(39);
+                atmSimulator.setLikeCount(0);
 
                 projectRepository.saveAll(Arrays.asList(nexstore, atmSimulator));
+            } else {
+                // Reset likes on existing records to 0 per user requirement
+                List<Project> existing = projectRepository.findAll();
+                boolean changed = false;
+                for (Project p : existing) {
+                    if (p.getLikeCount() != 0) {
+                        p.setLikeCount(0);
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    projectRepository.saveAll(existing);
+                }
             }
         };
     }
