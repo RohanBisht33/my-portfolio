@@ -88,6 +88,23 @@
             border-radius: 3px;
         }
 
+        /* ── Admin Visibility System ── */
+        .admin-only {
+            display: none !important;
+        }
+        body.admin-mode .admin-only,
+        html.admin-mode .admin-only {
+            display: inline-flex !important;
+        }
+        body.admin-mode div.admin-only,
+        html.admin-mode div.admin-only {
+            display: block !important;
+        }
+        body.admin-mode li.admin-only,
+        html.admin-mode li.admin-only {
+            display: list-item !important;
+        }
+
         body {
             background-color: var(--void);
             color: var(--text);
@@ -1779,6 +1796,7 @@
             <li><a href="#education">Education &amp; Awards</a></li>
             <li><a href="#terminal-section">Terminal</a></li>
             <li><a href="#contact">Contact</a></li>
+            <li class="admin-only"><button class="btn btn-purple" id="btn-add-project-nav" style="padding:0.35rem 0.8rem;font-size:0.75rem;cursor:pointer;">+ Add Project</button></li>
         </ul>
         <button class="hamburger" id="hamburger-btn" aria-label="Open menu">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1796,6 +1814,7 @@
         <a href="#education" class="mobile-nav-link">Education &amp; Awards</a>
         <a href="#terminal-section" class="mobile-nav-link">Terminal</a>
         <a href="#contact" class="mobile-nav-link">Contact</a>
+        <a href="javascript:void(0)" class="mobile-nav-link admin-only" id="btn-add-project-mobile" style="color:var(--purple);font-weight:600;">+ Add Project (Admin)</a>
     </div>
 
     <!-- ═══════════════════════════════════════════════════════════
@@ -1860,7 +1879,7 @@
                     </svg>
                     View Projects
                 </a>
-                <button class="btn btn-purple admin-only" id="btn-add-project" style="display:none;" title="Admin privilege active">
+                <button class="btn btn-purple admin-only" id="btn-add-project" title="Admin privilege active">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         aria-hidden="true">
                         <line x1="12" y1="5" x2="12" y2="19" />
@@ -1999,7 +2018,7 @@
                 <div class="section-rule" aria-hidden="true"></div>
             </div>
 
-            <div style="margin-bottom:1.5rem;display:none;" class="fade-up delay-1 admin-only" id="add-project-wrapper">
+            <div style="margin-bottom:1.5rem;" class="fade-up delay-1 admin-only" id="add-project-wrapper">
                 <button class="btn btn-purple" id="btn-add-project-section">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19" />
@@ -2501,6 +2520,29 @@
     <script>
         "use strict";
 
+        // Immediate admin visibility handler
+        window.updateAdminVisibility = function() {
+            const token = localStorage.getItem('adminToken');
+            const isAdmin = !!token;
+            document.body.classList.toggle('admin-mode', isAdmin);
+            document.documentElement.classList.toggle('admin-mode', isAdmin);
+            document.querySelectorAll('.admin-only').forEach(el => {
+                if (isAdmin) {
+                    if (el.tagName === 'LI') {
+                        el.style.setProperty('display', 'list-item', 'important');
+                    } else if (el.tagName === 'BUTTON' || el.tagName === 'A') {
+                        el.style.setProperty('display', 'inline-flex', 'important');
+                    } else {
+                        el.style.setProperty('display', 'block', 'important');
+                    }
+                } else {
+                    el.style.setProperty('display', 'none', 'important');
+                }
+            });
+        };
+        try { window.updateAdminVisibility(); } catch(e){}
+        document.addEventListener('DOMContentLoaded', window.updateAdminVisibility);
+
         /* ═══════════════════════════════════════════════════════════
            MODULE A: THREE.JS WARP-SPEED PARTICLE SYSTEM
            ─────────────────────────────────────────────
@@ -2894,53 +2936,61 @@
              * @param {HTMLElement} btn       - The clicked button element
              */
             async function handleLike(projectId, btn) {
-                if (likedSet.has(projectId)) {
-                    Toast.show('Already liked this project ✓');
-                    return;
-                }
                 if (btn.classList.contains('loading')) return;
 
-                // ─ Optimistic UI ─
                 const counterEl = btn.querySelector('.like-count');
                 const prevCount = parseInt(counterEl?.textContent || '0', 10);
-                const newCount = prevCount + 1;
+                const isAlreadyLiked = likedSet.has(projectId) || btn.classList.contains('liked');
+                
+                // If it's already liked AND count is > 0, we treat click as toggle (unlike)
+                // If count is 0, we always treat as like so their like is guaranteed to be counted
+                const isLiking = !isAlreadyLiked || prevCount === 0;
+                const endpoint = isLiking ? `/api/projects/${projectId}/like` : `/api/projects/${projectId}/unlike`;
 
-                btn.classList.add('loading', 'liked');
-                if (counterEl) counterEl.textContent = newCount;
-                likedSet.add(projectId);
+                btn.classList.add('loading');
+                if (isLiking) {
+                    btn.classList.add('liked');
+                    likedSet.add(projectId);
+                    if (counterEl) counterEl.textContent = prevCount + 1;
+                } else {
+                    btn.classList.remove('liked');
+                    likedSet.delete(projectId);
+                    if (counterEl) counterEl.textContent = Math.max(0, prevCount - 1);
+                }
                 persistLiked();
 
                 try {
-                    const response = await fetch(`/api/projects/${projectId}/like`, {
+                    const response = await fetch(endpoint, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            // Include CSRF token if Spring Security is active
-                            // Reads from meta tag: <meta name="_csrf" th:content="${_csrf.token}">
-                            'X-CSRF-TOKEN': document
-                                .querySelector('meta[name="_csrf"]')?.content || ''
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="_csrf"]')?.content || ''
                         },
                         body: JSON.stringify({ projectId })
                     });
 
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-                    // Server may return the authoritative count
                     const data = await response.json().catch(() => ({}));
                     if (data?.likeCount !== undefined && counterEl) {
                         counterEl.textContent = data.likeCount;
                     }
 
-                    Toast.show('Liked! ♥');
+                    Toast.show(isLiking ? 'Liked! ♥' : 'Like removed');
 
                 } catch (err) {
-                    // ─ Rollback on failure ─
+                    // Rollback on failure
                     if (counterEl) counterEl.textContent = prevCount;
-                    btn.classList.remove('liked');
-                    likedSet.delete(projectId);
+                    if (isAlreadyLiked && prevCount > 0) {
+                        btn.classList.add('liked');
+                        likedSet.add(projectId);
+                    } else {
+                        btn.classList.remove('liked');
+                        likedSet.delete(projectId);
+                    }
                     persistLiked();
 
-                    console.error('[LikeSystem] POST failed:', err);
+                    console.error('[LikeSystem] Request failed:', err);
                     Toast.show('Could not reach server — try again.', 3000);
 
                 } finally {

@@ -119,6 +119,18 @@ public class ProjectApiController {
         }).orElse(ResponseEntity.notFound().build());
     }
 
+    @PostMapping("/{id}/unlike")
+    public ResponseEntity<?> unlikeProject(@PathVariable Long id) {
+        return projectRepository.findById(id).map(project -> {
+            int current = project.getLikeCount();
+            if (current > 0) {
+                project.setLikeCount(current - 1);
+                projectRepository.save(project);
+            }
+            return ResponseEntity.ok(Map.of("likeCount", project.getLikeCount()));
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
     @PostMapping("/{id}/comment")
     public ResponseEntity<?> commentOnProject(@PathVariable Long id, @RequestBody Map<String, String> body) {
         String commentBody = body.get("body");

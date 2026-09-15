@@ -68,21 +68,6 @@ public class DataInitializer {
                 projectRepository.save(atmSimulator);
                 addedNew = true;
             }
-
-            if (!addedNew) {
-                // Reset likes on existing records to 0 per user requirement
-                List<Project> existing = projectRepository.findAll();
-                boolean changed = false;
-                for (Project p : existing) {
-                    if (p.getLikeCount() != 0) {
-                        p.setLikeCount(0);
-                        changed = true;
-                    }
-                }
-                if (changed) {
-                    projectRepository.saveAll(existing);
-                }
-            }
         };
     }
 }

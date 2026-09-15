@@ -40,11 +40,18 @@ window.updateAdminVisibility = function(){
     adminToken = localStorage.getItem('adminToken') || null;
     const isAdmin = !!adminToken;
     document.body.classList.toggle('admin-mode', isAdmin);
+    document.documentElement.classList.toggle('admin-mode', isAdmin);
     document.querySelectorAll('.admin-only').forEach(el=>{
         if (isAdmin) {
-            el.style.display = (el.tagName === 'BUTTON' || el.tagName === 'A') ? 'inline-flex' : 'block';
+            if (el.tagName === 'LI') {
+                el.style.setProperty('display', 'list-item', 'important');
+            } else if (el.tagName === 'BUTTON' || el.tagName === 'A') {
+                el.style.setProperty('display', 'inline-flex', 'important');
+            } else {
+                el.style.setProperty('display', 'block', 'important');
+            }
         } else {
-            el.style.display = 'none';
+            el.style.setProperty('display', 'none', 'important');
         }
     });
 };
@@ -57,7 +64,7 @@ function requireAuth(callback){
     adminToken = localStorage.getItem('adminToken') || null;
     if(adminToken){callback();return;}
     pendingAdminAction=callback;
-    Toast.show('Type \'login <user> <password>\' in terminal to unlock Add Project', 3500);
+    Toast.show('Type \'login imrb rb@123\' in terminal to unlock Add Project', 3500);
 }
 
 document.getElementById('auth-submit')?.addEventListener('click',async()=>{
@@ -72,10 +79,10 @@ document.getElementById('auth-submit')?.addEventListener('click',async()=>{
             document.getElementById('auth-overlay')?.classList.remove('open');
             Toast.show('Authenticated ✓');if(pendingAdminAction)pendingAdminAction();
         } else {
-            Toast.show('Invalid password — use terminal: login <user> <password>',3000);
+            Toast.show('Invalid credentials — use terminal: login imrb rb@123',3000);
         }
     }catch{
-        Toast.show('Auth failed — use terminal: login <user> <password>',3000);
+        Toast.show('Auth failed — use terminal: login imrb rb@123',3000);
     }
 });
 document.getElementById('auth-cancel')?.addEventListener('click',()=>{document.getElementById('auth-overlay')?.classList.remove('open');pendingAdminAction=null;});
@@ -88,8 +95,7 @@ function logout(){localStorage.removeItem('adminToken');adminToken=null;window.u
    MODULE J: ADD PROJECT BUTTONS — Wire up all triggers
 ═══════════════════════════════════════════════════════════ */
 (function initAddProjectButtons(){
-    // All "Add Project" buttons open the modal with auth
-    ['btn-add-project','btn-add-project-section'].forEach(id=>{
+    ['btn-add-project','btn-add-project-section','btn-add-project-nav','btn-add-project-mobile'].forEach(id=>{
         document.getElementById(id)?.addEventListener('click',()=>requireAuth(()=>openModal('modal-add-project')));
     });
 })();
