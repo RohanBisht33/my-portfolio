@@ -116,7 +116,7 @@ public class TerminalApiController {
         } else if (base.equals("login")) {
             if (rawParts.length < 3) {
                 output.add("[auth] Usage: login <username> <password>");
-                output.add("[auth] Example: login imrb rb@123");
+                output.add("[auth] Example: login <your-username> <your-password>");
                 exitCode = 1;
             } else {
                 String username = rawParts[1];

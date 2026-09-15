@@ -18,7 +18,8 @@ public class DataInitializer {
     @Bean
     public CommandLineRunner initProjects(ProjectRepository projectRepository) {
         return args -> {
-            if (projectRepository.count() == 0) {
+            boolean addedNew = false;
+            if (projectRepository.findAll().stream().noneMatch(p -> p.getTitle().contains("NexStore"))) {
                 // Project 1: NexStore — E-Commerce
                 Project nexstore = new Project();
                 nexstore.setTitle("NexStore - E-Commerce");
@@ -39,7 +40,12 @@ public class DataInitializer {
                 nexstore.setLiveUrl("https://nexstore.azurewebsites.net");
                 nexstore.setGithubUrl("https://github.com/RohanBisht33");
                 nexstore.setLikeCount(0);
+                nexstore.setImage("/images/project-default.png");
+                projectRepository.save(nexstore);
+                addedNew = true;
+            }
 
+            if (projectRepository.findAll().stream().noneMatch(p -> p.getTitle().contains("ATM Simulator"))) {
                 // Project 2: Enterprise ATM Simulator
                 Project atmSimulator = new Project();
                 atmSimulator.setTitle("Enterprise ATM Simulator");
@@ -58,9 +64,12 @@ public class DataInitializer {
                 atmSimulator.setFeatured(true);
                 atmSimulator.setGithubUrl("https://github.com/RohanBisht33/atm-simulator");
                 atmSimulator.setLikeCount(0);
+                atmSimulator.setImage("/images/project-default.png");
+                projectRepository.save(atmSimulator);
+                addedNew = true;
+            }
 
-                projectRepository.saveAll(Arrays.asList(nexstore, atmSimulator));
-            } else {
+            if (!addedNew) {
                 // Reset likes on existing records to 0 per user requirement
                 List<Project> existing = projectRepository.findAll();
                 boolean changed = false;

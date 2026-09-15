@@ -39,8 +39,13 @@ window.closeModal = closeModal;
 window.updateAdminVisibility = function(){
     adminToken = localStorage.getItem('adminToken') || null;
     const isAdmin = !!adminToken;
+    document.body.classList.toggle('admin-mode', isAdmin);
     document.querySelectorAll('.admin-only').forEach(el=>{
-        el.style.display = isAdmin ? '' : 'none';
+        if (isAdmin) {
+            el.style.display = (el.tagName === 'BUTTON' || el.tagName === 'A') ? 'inline-flex' : 'block';
+        } else {
+            el.style.display = 'none';
+        }
     });
 };
 
@@ -52,7 +57,7 @@ function requireAuth(callback){
     adminToken = localStorage.getItem('adminToken') || null;
     if(adminToken){callback();return;}
     pendingAdminAction=callback;
-    Toast.show('Type \'login imrb rb@123\' in terminal to unlock Add Project', 3500);
+    Toast.show('Type \'login <user> <password>\' in terminal to unlock Add Project', 3500);
 }
 
 document.getElementById('auth-submit')?.addEventListener('click',async()=>{
@@ -67,10 +72,10 @@ document.getElementById('auth-submit')?.addEventListener('click',async()=>{
             document.getElementById('auth-overlay')?.classList.remove('open');
             Toast.show('Authenticated ✓');if(pendingAdminAction)pendingAdminAction();
         } else {
-            Toast.show('Invalid password — use terminal: login imrb rb@123',3000);
+            Toast.show('Invalid password — use terminal: login <user> <password>',3000);
         }
     }catch{
-        Toast.show('Auth failed — use terminal: login imrb rb@123',3000);
+        Toast.show('Auth failed — use terminal: login <user> <password>',3000);
     }
 });
 document.getElementById('auth-cancel')?.addEventListener('click',()=>{document.getElementById('auth-overlay')?.classList.remove('open');pendingAdminAction=null;});
