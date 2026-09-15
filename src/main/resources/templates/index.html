@@ -1031,19 +1031,45 @@
         ═══════════════════════════════════════════════════ */
         @media (max-width: 768px) {
             .page-wrapper {
-                padding: 0 1rem 6rem;
+                padding: 0 1rem 5rem;
+            }
+
+            .hero {
+                padding: 5rem 0 3rem;
             }
 
             .hero-name {
-                letter-spacing: -2px;
+                font-size: clamp(2.5rem, 10vw, 3.5rem);
+                letter-spacing: -1.5px;
+                line-height: 1.1;
+                margin-bottom: 1.5rem;
+            }
+            
+            .hero-eyebrow {
+                font-size: 0.7rem;
+                margin-bottom: 1rem;
             }
 
             .projects-grid {
                 grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            
+            .project-card {
+                padding: 1.25rem;
+            }
+            
+            .project-header h3 {
+                font-size: 1.25rem;
             }
 
             .skills-grid {
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .topbar {
+                padding: 0.75rem 1rem;
             }
 
             .topbar-nav {
@@ -1052,6 +1078,16 @@
 
             .hero-terminal {
                 padding: 1rem 1.25rem;
+                margin-bottom: 2rem;
+            }
+            
+            .section-title {
+                font-size: 1.75rem;
+                margin-bottom: 2rem;
+            }
+            
+            .edu-card, .cert-card, .contact-card {
+                padding: 1.25rem;
             }
         }
 
