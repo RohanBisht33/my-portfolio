@@ -15,8 +15,8 @@ public class KeepAliveTask {
     // The public URL of the Render deployment
     private final String APP_URL = "https://portfolio-iw85.onrender.com/";
 
-    // Runs every 14 minutes (840000 ms) to keep the Render free tier instance awake
-    @Scheduled(fixedRate = 840000)
+    // Runs every 14 minutes (840000 ms) after an initial delay of 3 minutes
+    @Scheduled(initialDelay = 180000, fixedRate = 840000)
     public void pingSelf() {
         try {
             logger.info("Keep-alive pinging: {}", APP_URL);
